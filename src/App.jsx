@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/common-components/ProtectedRoute'
-import SignIn from './components/pages/SignIN'
+import SignIn from './components/pages/SignIn'
 import Layout from './components/layout/Layout'
 import SupabaseDashboard from './components/pages/SupabaseDashboard'
 import AuditSelection from './components/pages/AuditSelection'
