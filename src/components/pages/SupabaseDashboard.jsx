@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Activity, Users, TrendingUp, AlertTriangle, Plus, RefreshCw, Calendar } from 'lucide-react'
 import { useSelector } from 'react-redux'
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess'
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess'
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits'
 import SubscriptionStatusCard from '../Dashboard/SubscriptionStatusCard'
 import MetricsCard from '../Dashboard/MetricsCard'

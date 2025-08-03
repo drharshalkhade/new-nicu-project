@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BarChart3, Download, Calendar, Filter } from 'lucide-react';
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess';
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 
 const REPORT_AUDIT_OPTIONS = [

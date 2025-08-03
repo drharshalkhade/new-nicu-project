@@ -7,7 +7,7 @@ import {
   Eye,
   UserCheck,
 } from 'lucide-react';
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess';
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 import { useSelector } from 'react-redux';
 import CreateUserModal from '../Modals/CreateUserModal';
 

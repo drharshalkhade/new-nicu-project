@@ -8,7 +8,7 @@ import {
   Settings as Lungs,
   SprayCan as Spray
 } from 'lucide-react';
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess';
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 
 const AuditSelection = () => {
   const { hasPermission, getAccessibleAuditTypes } = useRoleBasedAccess();

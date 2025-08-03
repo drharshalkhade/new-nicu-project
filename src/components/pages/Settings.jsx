@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building, Calendar, CreditCard, MapPin, Plus, Settings as SettingsIcon, Users } from 'lucide-react';
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess';
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 import { supabase } from '../../lib/supabaseClient';
 import { signUp } from '../../utils/signUp';
 import { useSelector } from 'react-redux';

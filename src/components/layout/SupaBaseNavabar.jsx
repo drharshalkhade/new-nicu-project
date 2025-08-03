@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { Activity, Users, BarChart3, BookOpen, Settings, LogOut, Menu as MenuIcon, X } from 'lucide-react'
-import { useRoleBasedAccess } from '../../hooks/useROleBasedAccess'
+import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess'
 import { signOutAction } from '../../store/user/userThunk'
 import { useState } from 'react'
 
