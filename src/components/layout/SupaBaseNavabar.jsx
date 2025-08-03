@@ -135,4 +135,4 @@ const SupaBaseNavbar = () => {
   )
 }
 
-export default SupaBaseNavbar
+export default SupaBaseNavbar;

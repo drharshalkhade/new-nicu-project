@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import SupaBaseNavbar from './SupaBaseNavbar';
+import SupaBaseNavbar from './SupaBasenavabar';
 
 const Layout = () => {
   return (
