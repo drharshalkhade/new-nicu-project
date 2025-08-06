@@ -7,16 +7,16 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Form, Input, Select, Radio, Button, message, Spin } from 'antd';
-import { supabase } from '../../lib/supabaseClient';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { useAuth } from '../../hooks/useAuth';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { calculateNIVCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import ComplianceDisplay from '../common-components/ComplianceDisplay';
 
 const { Option } = Select;
 
 const respiratorySupportOptions = ['CPAP', 'NIPPV', 'HFNC'];
-
 const nasalTraumaOptions = [
   'No trauma',
   'Stage 1 - Non blanching erythema',
@@ -27,11 +27,12 @@ const nasalTraumaOptions = [
 const NIVForm = () => {
   const navigate = useNavigate();
   const { createAudit } = useSupabaseAudits();
-    const { user } = useAuth();
-    const profile = useSelector(state => state.user.userDetails);
+  const { user } = useAuth();
+  const profile = useSelector(state => state.user.userDetails);
+  const dispatch = useDispatch();
+  const nicuAreas = useSelector(state => state.nicuArea.areas);
+  const loadingAreas = useSelector(state => state.nicuArea.loading);
 
-  const [nicuAreas, setNicuAreas] = useState([]);
-  const [loadingAreas, setLoadingAreas] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     common: true,
     cpap: false,
@@ -40,40 +41,13 @@ const NIVForm = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-
   const [form] = Form.useForm();
 
   useEffect(() => {
-    if (profile?.organization_id) fetchNicuAreas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile]);
-
-  const fetchNicuAreas = async () => {
-    setLoadingAreas(true);
-    try {
-      const { data, error } = await supabase
-        .from('nicu_areas_with_org')
-        .select('id, name')
-        .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setNicuAreas(data || []);
-    } catch (error) {
-      console.error('Error fetching NICU areas:', error);
-      setNicuAreas([]);
-    } finally {
-      setLoadingAreas(false);
+    if (profile?.organization_id && nicuAreas.length === 0 && !loadingAreas) {
+      dispatch(fetchNicuAreas(profile.organization_id));
     }
-  };
-
-  // const toggleSection = (section) => {
-  //   setExpandedSections((prev) => ({
-  //     ...prev,
-  //     [section]: !prev[section],
-  //   }));
-  // };
+  }, [profile?.organization_id]);
 
   const handleRespiratorySupportChange = (value) => {
     form.setFieldsValue({ respiratorySupport: value });
@@ -85,21 +59,10 @@ const NIVForm = () => {
     });
   };
 
-  // const calculateCompliance = () => {
-  //   try {
-  //     const values = form.getFieldsValue();
-  //     const result = calculateNIVCompliance(values);
-  //     return result.score / 100;
-  //   } catch {
-  //     return 0;
-  //   }
-  // };
-
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setIsSubmitting(true);
-
       const auditRecord = {
         date: new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().slice(0, 5),
@@ -123,12 +86,9 @@ const NIVForm = () => {
         respiratorySupport: values.respiratorySupport,
         nivData: values,
       };
-
       await createAudit(auditRecord);
-
       setShowSuccess(true);
       message.success('NIV Audit submitted successfully! Redirecting...');
-
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);
@@ -195,11 +155,9 @@ const NIVForm = () => {
             >
               <Input placeholder="Enter patient name" />
             </Form.Item>
-
             <Form.Item label="Staff Name" name="staffName">
               <Input placeholder="Enter staff name" />
             </Form.Item>
-
             <Form.Item
               label="NICU Area"
               name="nicuAreaId"
@@ -255,13 +213,12 @@ const NIVForm = () => {
                   label={label}
                   rules={[{ required: true, message: 'This field is required' }]}
                 >
-                  <Radio.Group>
+                  <Radio.Group className="flex space-x-8">
                     <Radio value="Yes">Yes</Radio>
                     <Radio value="No">No</Radio>
                   </Radio.Group>
                 </Form.Item>
               ))}
-
               <Form.Item
                 label="Nasal Trauma"
                 name="nasalTrauma"
@@ -294,7 +251,6 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
-
               <Form.Item
                 label="Nasal Interface CPAP"
                 name="nasalInterfaceCPAP"
@@ -314,7 +270,6 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
-
               <Form.Item
                 label="Snug Fit CPAP"
                 name="snugFitCPAP"
@@ -328,7 +283,6 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
-
               <Form.Item label="Bubbling Present" name="bubblingPresent">
                 <Radio.Group>
                   {['Yes', 'No'].map((opt) => (
@@ -357,7 +311,6 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
-
               <Form.Item
                 label="Snug Fit NIPPV"
                 name="snugFitNIPPV"
@@ -390,7 +343,6 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
-
               <Form.Item
                 label="50% of Nares Covered HFNC"
                 name="naresCoveredHFNC"
@@ -409,102 +361,13 @@ const NIVForm = () => {
 
           {/* Compliance Rate Display */}
           {form.getFieldValue('respiratorySupport') && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-900">
-                  {form.getFieldValue('respiratorySupport')} Compliance
-                </h4>
-                <div className="text-right">
-                  <span
-                    className={`text-lg font-bold ${
-                      complianceLevel.color === 'green'
-                        ? 'text-green-600'
-                        : complianceLevel.color === 'yellow'
-                        ? 'text-yellow-600'
-                        : complianceLevel.color === 'orange'
-                        ? 'text-orange-600'
-                        : 'text-red-600'
-                    }`}
-                  >
-                    {complianceDetails.score.toFixed(0)}%
-                  </span>
-                  <div className="text-xs text-gray-500">{complianceLevel.level}</div>
-                </div>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    complianceLevel.color === 'green'
-                      ? 'bg-green-500'
-                      : complianceLevel.color === 'yellow'
-                      ? 'bg-yellow-500'
-                      : complianceLevel.color === 'orange'
-                      ? 'bg-orange-500'
-                      : 'bg-red-500'
-                  }`}
-                  style={{ width: `${complianceDetails.score}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                <span>
-                  Fields Completed: {complianceDetails.completedFields}/{complianceDetails.totalFields}
-                </span>
-                <span>{complianceLevel.description}</span>
-              </div>
-              {complianceDetails.details.nasalTrauma && (
-                <div
-                  className={`p-2 rounded text-xs mb-2 ${
-                    complianceDetails.details.nasalTrauma.score >= 75 ? 'bg-green-50' : 'bg-red-50'
-                  }`}
-                >
-                  <div
-                    className={`font-medium mb-1 ${
-                      complianceDetails.details.nasalTrauma.score >= 75
-                        ? 'text-green-900'
-                        : 'text-red-900'
-                    }`}
-                  >
-                    Nasal Trauma Assessment:
-                  </div>
-                  <div
-                    className={
-                      complianceDetails.details.nasalTrauma.score >= 75
-                        ? 'text-green-800'
-                        : 'text-red-800'
-                    }
-                  >
-                    {complianceDetails.details.nasalTrauma.value} (
-                    {complianceDetails.details.nasalTrauma.score}% score)
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="bg-blue-50 p-2 rounded text-center">
-                  <div className="font-medium text-blue-900">Common</div>
-                  <div className="text-blue-800">
-                    {complianceDetails.details.commonFieldsScore.toFixed(0)}%
-                  </div>
-                </div>
-                <div className="bg-purple-50 p-2 rounded text-center">
-                  <div className="font-medium text-purple-900">Specific</div>
-                  <div className="text-purple-800">
-                    {complianceDetails.details.specificFieldsScore.toFixed(0)}%
-                  </div>
-                </div>
-                <div className="bg-orange-50 p-2 rounded text-center">
-                  <div className="font-medium text-orange-900">Safety</div>
-                  <div className="text-orange-800">
-                    {complianceDetails.details.nasalTraumaScore.toFixed(0)}%
-                  </div>
-                </div>
-              </div>
-              {isLowCompliance && (
-                <div className="flex items-center space-x-2 mt-2 text-red-600">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">Below 80% compliance threshold</span>
-                </div>
-              )}
-            </div>
+            <ComplianceDisplay
+              complianceScore={complianceDetails.score}
+              complianceLevel={complianceLevel}
+              totalFields={complianceDetails.totalFields}
+              completedFields={complianceDetails.completedFields}
+              lowCompliance={isLowCompliance}
+            />
           )}
 
           {/* Submit Section */}

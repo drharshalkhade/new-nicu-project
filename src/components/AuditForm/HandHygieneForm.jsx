@@ -16,16 +16,17 @@ import {
   message,
   Checkbox,
 } from 'antd';
-import { supabase } from '../../lib/supabaseClient';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { calculateHandHygieneCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
 import { useAuth } from '../../hooks/useAuth';
+import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import ComplianceDisplay from '../common-components/ComplianceDisplay';
+
 const { TextArea } = Input;
 const { Option } = Select;
 
 const hcpOptions = ['Doctor', 'Nurse', 'Housekeeping', 'Radiology', 'Others'];
-
 const opportunityTypes = [
   'Moment 1 - Before touching patients',
   'Moment 2 - Before Clean Procedure',
@@ -33,10 +34,8 @@ const opportunityTypes = [
   'Moment 4 - After touching the Patients',
   'Moment 5 - After touching surroundings',
 ];
-
 const adherenceStepsOptions = ['Less than 3', '3 to 5 steps', '6 Steps', '0 Steps'];
 const handRubDurationOptions = ['<10 sec', '10-20 sec', '>20 sec', '0 sec'];
-
 const glovesRequiredForOptions = [
   'Intubation',
   'IV line insertion',
@@ -51,40 +50,19 @@ const HandHygieneForm = () => {
   const { createAudit } = useSupabaseAudits();
   const { user } = useAuth();
   const profile = useSelector(state => state.user.userDetails);
+  const dispatch = useDispatch();
+  const nicuAreas = useSelector(state => state.nicuArea.areas);
+  const loadingAreas = useSelector(state => state.nicuArea.loading);
 
-  const [nicuAreas, setNicuAreas] = useState([]);
-  const [loadingAreas, setLoadingAreas] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
-
   const [form] = Form.useForm();
 
   useEffect(() => {
-    if (profile?.organization_id) {
-      fetchNicuAreas();
+    if (profile?.organization_id && nicuAreas.length === 0 && !loadingAreas) {
+      dispatch(fetchNicuAreas(profile.organization_id));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.organization_id]);
-
-  const fetchNicuAreas = async () => {
-    setLoadingAreas(true);
-    try {
-      const { data, error } = await supabase
-        .from('nicu_areas_with_org')
-        .select('id, name')
-        .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setNicuAreas(data || []);
-    } catch (error) {
-      console.error('Error fetching NICU areas:', error);
-      setNicuAreas([]);
-    } finally {
-      setLoadingAreas(false);
-    }
-  };
 
   const calculateCompliance = (values) => {
     try {
@@ -105,9 +83,7 @@ const HandHygieneForm = () => {
         afterPatientContact: values.opportunityType?.includes('Moment 4 - After touching the Patients') || false,
         afterPatientSurroundings: values.opportunityType?.includes('Moment 5 - After touching surroundings') || false,
       };
-
       const complianceResult = calculateHandHygieneCompliance(values);
-
       const auditRecord = {
         date: new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().slice(0, 5),
@@ -127,15 +103,11 @@ const HandHygieneForm = () => {
         glovesRequiredFor: values.glovesRequiredFor ? values.glovesRequiredFor.join(', ') : '',
         glovesUsed: values.glovesUsed,
         notifiedBedside: values.notifiedBedside,
-        // Handle image upload - this example stores file object; you may need to handle uploading elsewhere
         imageUpload: values.imageUpload || null,
       };
-
       await createAudit(auditRecord);
-
       message.success('Audit submitted successfully');
       setShowSuccess(true);
-
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);
@@ -217,16 +189,13 @@ const HandHygieneForm = () => {
                 <div>{new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Form.Item label="Patient Name" name="patientName">
                 <Input placeholder="Enter patient name" />
               </Form.Item>
-
               <Form.Item label="Bedside Staff Name" name="bedsideStaffName">
                 <Input placeholder="Enter staff name" />
               </Form.Item>
-
               <Form.Item
                 label="Hospital Name"
                 name="hospitalName"
@@ -250,7 +219,6 @@ const HandHygieneForm = () => {
                   ))}
                 </Select>
               </Form.Item>
-
               <Form.Item
                 label="NICU Area Id"
                 name="nicuAreaId"
@@ -307,7 +275,6 @@ const HandHygieneForm = () => {
                 ))}
               </Radio.Group>
             </Form.Item>
-
             <Form.Item
               label="Time Duration of Hand Rub"
               name="handRubDuration"
@@ -326,13 +293,12 @@ const HandHygieneForm = () => {
           {/* Gloves Assessment */}
           <div className="bg-purple-50 p-6 rounded-lg">
             <h3 className="text-lg font-semibold text-purple-900 mb-4">Gloves Assessment</h3>
-
             <Form.Item
               label="Gloves Required?"
               name="glovesRequired"
               rules={[{ required: true, message: 'Please select an option' }]}
             >
-              <Radio.Group>
+              <Radio.Group className="flex space-x-8">
                 {['Yes', 'No'].map(option => (
                   <Radio key={option} value={option}>
                     {option}
@@ -340,37 +306,33 @@ const HandHygieneForm = () => {
                 ))}
               </Radio.Group>
             </Form.Item>
-
-            <Form.Item
-              label="Gloves Required For"
-              name="glovesRequiredFor"
-              dependencies={['glovesRequired']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (getFieldValue('glovesRequired') === 'Yes' && (!value || value.length === 0)) {
-                      return Promise.reject('Please select at least one option');
-                    }
-                    return Promise.resolve();
-                  },
-                }),
-              ]}
-            >
-              <Checkbox.Group disabled={form.getFieldValue('glovesRequired') !== 'Yes'}>
-                {glovesRequiredForOptions.map(option => (
-                  <Checkbox key={option} value={option}>
-                    {option}
-                  </Checkbox>
-                ))}
-              </Checkbox.Group>
+            <Form.Item shouldUpdate={(prev, cur) => prev.glovesRequired !== cur.glovesRequired}>
+              {({ getFieldValue }) =>
+                getFieldValue('glovesRequired') === 'Yes' && (
+                  <Form.Item
+                    label="Gloves Required For"
+                    name="glovesRequiredFor"
+                    rules={[
+                      { required: true, message: 'Please select at least one option' },
+                    ]}
+                  >
+                    <Checkbox.Group>
+                      {glovesRequiredForOptions.map(option => (
+                        <Checkbox key={option} value={option}>
+                          {option}
+                        </Checkbox>
+                      ))}
+                    </Checkbox.Group>
+                  </Form.Item>
+                )
+              }
             </Form.Item>
-
             <Form.Item
               label="Gloves Used"
               name="glovesUsed"
               rules={[{ required: true, message: 'Please select an option' }]}
             >
-              <Radio.Group>
+              <Radio.Group className="flex space-x-8">
                 {['Yes', 'No'].map(option => (
                   <Radio key={option} value={option}>
                     {option}
@@ -378,13 +340,12 @@ const HandHygieneForm = () => {
                 ))}
               </Radio.Group>
             </Form.Item>
-
             <Form.Item
               label="Notified Bedside"
               name="notifiedBedside"
               rules={[{ required: true, message: 'Please select an option' }]}
             >
-              <Radio.Group>
+              <Radio.Group className="flex space-x-8">
                 {['Yes', 'No'].map(option => (
                   <Radio key={option} value={option}>
                     {option}
@@ -395,52 +356,13 @@ const HandHygieneForm = () => {
           </div>
 
           {/* Compliance Display */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-900">Compliance Rate</h4>
-              <div className="text-right">
-                <span
-                  className={`text-lg font-bold ${
-                    complianceLevel.color === 'green'
-                      ? 'text-green-600'
-                      : complianceLevel.color === 'yellow'
-                      ? 'text-yellow-600'
-                      : 'text-red-600'
-                  }`}
-                >
-                  {complianceDetails.score.toFixed(0)}%
-                </span>
-                <div className="text-xs text-gray-500">{complianceLevel.level}</div>
-              </div>
-            </div>
-
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-              <div
-                className={`h-2 rounded-full ${
-                  complianceLevel.color === 'green'
-                    ? 'bg-green-500'
-                    : complianceLevel.color === 'yellow'
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500'
-                }`}
-                style={{ width: `${complianceDetails.score}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-gray-600">
-              <span>
-                Moments Completed: {complianceDetails.completedFields}/{complianceDetails.totalFields}
-              </span>
-              <span>{complianceLevel.description}</span>
-            </div>
-
-            {isLowCompliance && (
-              <div className="flex items-center space-x-2 mt-2 text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm">Below 80% compliance threshold</span>
-              </div>
-            )}
-          </div>
+          <ComplianceDisplay
+            complianceScore={complianceDetails.score}
+            complianceLevel={complianceLevel}
+            totalFields={complianceDetails.totalFields}
+            completedFields={complianceDetails.completedFields}
+            lowCompliance={isLowCompliance}
+          />
 
           {/* Comments */}
           <Form.Item label="Comments" name="comments">

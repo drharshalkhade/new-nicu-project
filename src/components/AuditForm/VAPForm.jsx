@@ -5,7 +5,6 @@ import {
   CheckCircle,
   ArrowLeft,
 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
 import {
   calculateVAPCompliance,
   getComplianceLevel,
@@ -20,86 +19,97 @@ import {
   message,
 } from 'antd';
 import { useAuth } from '../../hooks/useAuth';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
+import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import BundleSection from '../common-components/BundleSection';
+import ComplianceDisplay from '../common-components/ComplianceDisplay';
 
 const { Option } = Select;
+
+const bundleFields = {
+  intubationBundle: [
+    { key: 'preSuppliesArranged', label: 'Supplies Arranged' },
+    { key: 'preIndication', label: 'Indication' },
+    { key: 'preEmergencyElective', label: 'Emergency/Elective' },
+    { key: 'preETSize', label: 'ET Tube Size' },
+    { key: 'preETDepth', label: 'ET Tube Depth' },
+    { key: 'procWearMask', label: 'Wear Mask/Gloves' },
+    { key: 'procHandWash', label: 'Hand Wash' },
+    { key: 'procAseptic', label: 'Aseptic Precautions' },
+    { key: 'procAppropriateSteps', label: 'Appropriate Steps' },
+  ],
+  reintubationBundle: [
+    { key: 'reintubationReason', label: 'Reason for Re-intubation' },
+    { key: 'reintubationChecklist', label: 'Checklist Used' },
+  ],
+  maintenanceBundle: [
+    { key: 'maintenanceCircuitChange', label: 'Circuit Change' },
+    { key: 'maintenanceHumidification', label: 'Humidification' },
+    { key: 'maintenanceSuction', label: 'Suction' },
+    { key: 'maintenanceChecklist', label: 'Checklist Used' },
+  ],
+  etSuctionBundle: [
+    { key: 'etSuctionIndication', label: 'Indication' },
+    { key: 'etSuctionSterility', label: 'Sterility Maintained' },
+    { key: 'etSuctionChecklist', label: 'Checklist Used' },
+  ],
+  extubationBundle: [
+    { key: 'extubationReadiness', label: 'Readiness Assessed' },
+    { key: 'extubationChecklist', label: 'Checklist Used' },
+  ],
+  postExtubationBundle: [
+    { key: 'postExtubationSupport', label: 'Support Provided' },
+    { key: 'postExtubationChecklist', label: 'Checklist Used' },
+  ],
+};
+
+const bundleOptions = [
+  { key: 'intubationBundle', label: 'Intubation Bundle' },
+  { key: 'reintubationBundle', label: 'Re-intubation Bundle' },
+  { key: 'maintenanceBundle', label: 'Maintenance Bundle' },
+  { key: 'etSuctionBundle', label: 'ET Suction Bundle' },
+  { key: 'extubationBundle', label: 'Extubation Bundle' },
+  { key: 'postExtubationBundle', label: 'Post Extubation Bundle' },
+];
 
 const VAPForm = () => {
   const navigate = useNavigate();
   const { createAudit } = useSupabaseAudits();
   const { user } = useAuth();
- const profile = useSelector(state => state.user.userDetails);
+  const profile = useSelector(state => state.user.userDetails);
+  const dispatch = useDispatch();
+  const nicuAreas = useSelector(state => state.nicuArea.areas);
+  const loadingAreas = useSelector(state => state.nicuArea.loading);
 
   const [form] = Form.useForm();
-
-  const [nicuAreas, setNicuAreas] = useState([]);
-  const [loadingAreas, setLoadingAreas] = useState(false);
-
-  // Controls which bundle section is expanded
   const [visibleSection, setVisibleSection] = useState('');
-
-  // Submit and success state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Fetch NICU Areas from backend - no fallback data
   useEffect(() => {
-    if (!profile?.organization_id) return;
-
-    const fetchNICUAreas = async () => {
-      setLoadingAreas(true);
-      try {
-        const { data, error } = await supabase
-          .from('nicu_areas_with_org')
-          .select('id, name')
-          .eq('organization_id', profile.organization_id)
-          .eq('is_active', true)
-          .order('name');
-
-        if (error) throw error;
-        setNicuAreas(data || []);
-      } catch (error) {
-        console.error('Failed to fetch NICU areas:', error.message);
-        setNicuAreas([]);
-      } finally {
-        setLoadingAreas(false);
-      }
-    };
-
-    fetchNICUAreas();
+    if (profile?.organization_id && nicuAreas.length === 0 && !loadingAreas) {
+      dispatch(fetchNicuAreas(profile.organization_id));
+    }
   }, [profile?.organization_id]);
 
-  // Handle navigation to sections on bundle selection
   const handleBundleSelection = (val) => {
     setVisibleSection(val);
     form.setFieldsValue({ bundleSelection: val });
-
     setTimeout(() => {
       const el = document.getElementById(val);
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
 
-  // const toggleSection = (section) => {
-  //   if (visibleSection === section) {
-  //     setVisibleSection('');
-  //   } else {
-  //     setVisibleSection(section);
-  //   }
-  // };
-
-  // Scroll back to top helper
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Form submit handler
   const onFinish = async (values) => {
     setIsSubmitting(true);
     try {
       const complianceData = calculateVAPCompliance(values);
-
       const auditRecord = {
         date: new Date().toISOString().slice(0, 10),
         time: new Date().toTimeString().slice(0, 5),
@@ -108,13 +118,6 @@ const VAPForm = () => {
         nicuAreas: nicuAreas.find((n) => n.id === values.nicuAreas)?.name || 'Unknown Area',
         nicuAreasId: values.nicuAreas,
         bundleSelection: values.bundleSelection,
-        moments: {
-          beforePatientContact: false,
-          beforeAsepticProcedure: false,
-          afterBodyFluidExposure: false,
-          afterPatientContact: false,
-          afterPatientSurroundings: false,
-        },
         compliance: complianceData.score / 100,
         notes: `VAP Audit - ${values.bundleSelection} - Patient: ${values.patientName}`,
         patientName: values.patientName,
@@ -122,11 +125,9 @@ const VAPForm = () => {
         vapData: values,
         auditType: 'VAP',
       };
-
       await createAudit(auditRecord);
       setShowSuccess(true);
       message.success('VAP Audit submitted successfully! Redirecting...');
-
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);
@@ -150,7 +151,6 @@ const VAPForm = () => {
     );
   }
 
-  // For compliance display
   const formValues = form.getFieldsValue();
   const complianceData = calculateVAPCompliance(formValues);
   const complianceLevel = getComplianceLevel(complianceData.score);
@@ -226,14 +226,7 @@ const VAPForm = () => {
               rules={[{ required: true, message: 'Please select a bundle' }]}
             >
               <Radio.Group onChange={(e) => handleBundleSelection(e.target.value)}>
-                {[
-                  { key: 'intubationBundle', label: 'Intubation Bundle' },
-                  { key: 'reintubationBundle', label: 'Re-intubation Bundle' },
-                  { key: 'maintenanceBundle', label: 'Maintenance Bundle' },
-                  { key: 'etSuctionBundle', label: 'ET Suction Bundle' },
-                  { key: 'extubationBundle', label: 'Extubation Bundle' },
-                  { key: 'postExtubationBundle', label: 'Post Extubation Bundle' },
-                ].map(({ key, label }) => (
+                {bundleOptions.map(({ key, label }) => (
                   <Radio.Button key={key} value={key} className="mb-2">
                     {label}
                   </Radio.Button>
@@ -241,39 +234,13 @@ const VAPForm = () => {
               </Radio.Group>
             </Form.Item>
 
-            {/* Dynamic Bundle Sections */}
-
-            {visibleSection === 'intubationBundle' && (
+            {/* Dynamic Bundle Sections - use BundleSection component */}
+            {visibleSection && bundleFields[visibleSection] && (
               <BundleSection
-                id="intubationBundle"
-                title="Intubation Bundle"
-                fields={[
-                  { key: 'preSuppliesArranged', label: 'Supplies Arranged' },
-                  { key: 'preIndication', label: 'Indication' },
-                  { key: 'preEmergencyElective', label: 'Emergency/Elective' },
-                  { key: 'preETSize', label: 'ET Tube Size' },
-                  { key: 'preETDepth', label: 'ET Tube Depth' },
-                  { key: 'procWearMask', label: 'Wear Mask/Gloves' },
-                  { key: 'procHandWash', label: 'Hand Wash' },
-                  { key: 'procAseptic', label: 'Aseptic Precautions' },
-                  { key: 'procAppropriateSteps', label: 'Appropriate Steps' },
-                ]}
+                id={visibleSection}
+                title={bundleOptions.find(opt => opt.key === visibleSection)?.label || ''}
+                fields={bundleFields[visibleSection]}
               />
-            )}
-            {visibleSection === 'reintubationBundle' && (
-              <BundleSection id="reintubationBundle" title="Re-intubation Bundle" fields={/* similar*/[]} />
-            )}
-            {visibleSection === 'maintenanceBundle' && (
-              <BundleSection id="maintenanceBundle" title="Maintenance Bundle" fields={/* similar*/[]} />
-            )}
-            {visibleSection === 'etSuctionBundle' && (
-              <BundleSection id="etSuctionBundle" title="ET Suction Bundle" fields={/* similar*/[]} />
-            )}
-            {visibleSection === 'extubationBundle' && (
-              <BundleSection id="extubationBundle" title="Extubation Bundle" fields={/* similar*/[]} />
-            )}
-            {visibleSection === 'postExtubationBundle' && (
-              <BundleSection id="postExtubationBundle" title="Post Extubation Bundle" fields={/* similar*/[]} />
             )}
 
             {/* Compliance Display */}
@@ -305,59 +272,5 @@ const VAPForm = () => {
     </div>
   );
 };
-
-const BundleSection = ({ id, title, fields }) => {
-
-  return (
-    <div id={id} className="bg-purple-100 rounded-md p-4">
-      <h3 className="text-xl font-semibold mb-4">{title}</h3>
-      <div className="grid gap-4 md:grid-cols-2">
-        {fields.map(({ key, label }) => (
-          <Form.Item
-            key={key}
-            label={label}
-            name={key}
-            rules={[{ required: true, message: 'This field is required.' }]}
-          >
-            <Radio.Group>
-              <Radio value="Yes">Yes</Radio>
-              <Radio value="No">No</Radio>
-            </Radio.Group>
-          </Form.Item>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const ComplianceDisplay = ({ complianceScore, complianceLevel, totalFields, completedFields, lowCompliance }) => (
-  <div className="bg-gray-50 rounded-lg p-4">
-    <div className="flex justify-between mb-2">
-      <h4 className="text-sm font-semibold">Compliance</h4>
-      <div className={`text-lg font-bold text-${complianceLevel.color}-600`}>
-        {complianceScore.toFixed(1)}%
-      </div>
-    </div>
-    <div className="w-full rounded-full bg-gray-200 h-2 mb-2">
-      <div
-        className={`rounded-full h-2 transition-all duration-300 bg-${complianceLevel.color}-500`}
-        style={{ width: `${complianceScore}%` }}
-      />
-    </div>
-    <div className="flex justify-between text-xs text-gray-600 mb-2">
-      <span>
-        Completed {completedFields}/{totalFields}
-      </span>
-      <span>{complianceLevel.description}</span>
-    </div>
-    {lowCompliance && (
-      <div className="flex items-center text-red-600 space-x-2 mt-1">
-        <AlertCircle size={16} />
-        <span className="text-sm">Below 80% compliance threshold</span>
-      </div>
-    )}
-  </div>
-);
-
 
 export default VAPForm;

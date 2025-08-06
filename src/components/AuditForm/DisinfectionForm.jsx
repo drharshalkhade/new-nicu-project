@@ -16,11 +16,12 @@ import {
   Spin,
   message,
 } from 'antd';
-import { supabase } from '../../lib/supabaseClient';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '../../hooks/useAuth';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { calculateDisinfectionCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import ComplianceDisplay from '../common-components/ComplianceDisplay';
 
 const { Option } = Select;
 
@@ -51,20 +52,15 @@ const taskDefinitions = {
   ],
 };
 
-// const taskOptions = [
-//   { value: 'daily', label: 'Daily Disinfection Tasks' },
-//   { value: 'afterUse', label: 'After Every Use Disinfection Tasks' },
-//   { value: 'weekly', label: 'Weekly Disinfection Tasks' },
-// ];
-
 const DisinfectionForm = () => {
   const navigate = useNavigate();
   const { createAudit } = useSupabaseAudits();
   const { user } = useAuth();
   const profile = useSelector(state => state.user.userDetails);
+  const dispatch = useDispatch();
+  const nicuAreas = useSelector(state => state.nicuArea.areas);
+  const loadingAreas = useSelector(state => state.nicuArea.loading);
 
-  const [nicuAreas, setNicuAreas] = useState([]);
-  const [loadingAreas, setLoadingAreas] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     daily: false,
     afterUse: false,
@@ -75,29 +71,10 @@ const DisinfectionForm = () => {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    if (profile?.organization_id) fetchNicuAreas();
-    console.log(submitStatus)
-  }, [profile]);
-
-  const fetchNicuAreas = async () => {
-    setLoadingAreas(true);
-    try {
-      const { data, error } = await supabase
-        .from('nicu_areas')
-        .select('id, name')
-        .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setNicuAreas(data || []);
-    } catch (error) {
-      console.error('Failed to fetch NICU areas:', error.message);
-      setNicuAreas([]);
-    } finally {
-      setLoadingAreas(false);
+    if (profile?.organization_id && nicuAreas.length === 0 && !loadingAreas) {
+      dispatch(fetchNicuAreas(profile.organization_id));
     }
-  };
+  }, [profile?.organization_id]);
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -124,10 +101,8 @@ const DisinfectionForm = () => {
   const onFinish = async (values) => {
     setIsSubmitting(true);
     setSubmitStatus('idle');
-
     try {
       const complianceObj = computeCompliance(values);
-
       const auditData = {
         type: 'disinfection',
         date: new Date().toISOString().slice(0, 10),
@@ -144,7 +119,6 @@ const DisinfectionForm = () => {
         complianceLevel: complianceObj,
         notes: `Disinfection audit - Staff: ${values.staffName || 'N/A'}`,
       };
-
       await createAudit(auditData);
       setSubmitStatus('success');
       message.success('Disinfection audit submitted successfully!');
@@ -160,7 +134,6 @@ const DisinfectionForm = () => {
 
   const complianceObj = computeCompliance(form.getFieldsValue());
   const complianceLevel = getComplianceLevel(complianceObj.score);
-  // const isLowCompliance = complianceObj.score < 80;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -205,11 +178,9 @@ const DisinfectionForm = () => {
                 <Form.Item label="Email" name="email" initialValue={user?.email} hidden>
                   <Input disabled />
                 </Form.Item>
-
                 <Form.Item label="Staff Name" name="staffName">
                   <Input placeholder="Enter staff name" />
                 </Form.Item>
-
                 <Form.Item
                   label="NICU Area"
                   name="nicuArea"
@@ -269,7 +240,6 @@ const DisinfectionForm = () => {
                   </h3>
                   {expandedSections[sectionKey] ? <ChevronUp /> : <ChevronDown />}
                 </button>
-
                 {expandedSections[sectionKey] && (
                   <div className="p-6 space-y-4">
                     {tasks.map(({ key, label }) => (
@@ -284,7 +254,7 @@ const DisinfectionForm = () => {
                           },
                         ]}
                       >
-                        <Radio.Group>
+                        <Radio.Group className="flex space-x-8">
                           <Radio value="Yes">Yes</Radio>
                           <Radio value="No">No</Radio>
                         </Radio.Group>
@@ -297,60 +267,13 @@ const DisinfectionForm = () => {
 
             {/* Compliance Display */}
             {form.getFieldValue('taskType') && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-sm font-medium text-gray-900">
-                    {taskDefinitions[form.getFieldValue('taskType')]?.length
-                      ? `${form.getFieldValue('taskType') === 'daily'
-                          ? 'Daily'
-                          : form.getFieldValue('taskType') === 'afterUse'
-                          ? 'After Use'
-                          : 'Weekly'} Disinfection Compliance`
-                      : ''}
-                  </h4>
-                  <div className="text-right">
-                    <span
-                      className={`text-lg font-bold ${
-                        complianceLevel.color === 'green'
-                          ? 'text-green-600'
-                          : complianceLevel.color === 'yellow'
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {complianceObj.score.toFixed(0)}%
-                    </span>
-                    <div className="text-xs">{complianceLevel.level}</div>
-                  </div>
-                </div>
-
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      complianceLevel.color === 'green'
-                        ? 'bg-green-500'
-                        : complianceLevel.color === 'yellow'
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                    }`}
-                    style={{ width: `${complianceObj.score}%` }}
-                  />
-                </div>
-
-                <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>
-                    Completed {complianceObj.completedFields}/{complianceObj.totalFields}
-                  </span>
-                  <span>{complianceLevel.description}</span>
-                </div>
-
-                {complianceObj.score < 80 && (
-                  <div className="flex items-center space-x-2 text-red-600">
-                    <AlertCircle />
-                    <span className="text-sm">Below 80% compliance threshold</span>
-                  </div>
-                )}
-              </div>
+              <ComplianceDisplay
+                complianceScore={complianceObj.score}
+                complianceLevel={complianceLevel}
+                totalFields={complianceObj.totalFields}
+                completedFields={complianceObj.completedFields}
+                lowCompliance={complianceObj.score < 80}
+              />
             )}
 
             {/* Submit Section */}

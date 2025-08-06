@@ -1,5 +1,38 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import ComplianceTable from '../common-components/ComplianceTable';
+
+const legend = (
+  <div className="flex items-center space-x-4 text-xs text-gray-500">
+    <div className="flex items-center space-x-1">
+      <div className="w-3 h-3 bg-green-100 rounded"></div>
+      <span>≥90% Excellent</span>
+    </div>
+    <div className="flex items-center space-x-1">
+      <div className="w-3 h-3 bg-yellow-100 rounded"></div>
+      <span>80-89% Good</span>
+    </div>
+    <div className="flex items-center space-x-1">
+      <div className="w-3 h-3 bg-orange-100 rounded"></div>
+      <span>70-79% Fair</span>
+    </div>
+    <div className="flex items-center space-x-1">
+      <div className="w-3 h-3 bg-red-100 rounded"></div>
+      <span>&lt;70% Poor</span>
+    </div>
+  </div>
+);
+
+const footer = 'Based on NIV safety guidelines';
+
+const getComplianceColor = (colKey, value) => {
+  if (colKey === 'category') return '';
+  const val = parseFloat(value?.replace('%', ''));
+  if (val >= 90) return 'text-green-600 bg-green-50';
+  if (val >= 80) return 'text-yellow-600 bg-yellow-50';
+  if (val >= 70) return 'text-orange-600 bg-orange-50';
+  return 'text-red-600 bg-red-50';
+};
 
 const NIVComplianceTable = () => {
   const userDetails = useSelector(state => state.user.userDetails);
@@ -61,106 +94,29 @@ const NIVComplianceTable = () => {
     }
   };
 
-  const getComplianceColor = value => {
-    const val = parseFloat(value.replace('%', ''));
-    if (val >= 90) return 'text-green-600 bg-green-50';
-    if (val >= 80) return 'text-yellow-600 bg-yellow-50';
-    if (val >= 70) return 'text-orange-600 bg-orange-50';
-    return 'text-red-600 bg-red-50';
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">NIV Bundle Compliance</h3>
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
+  // Dynamically generate columns: first is category, then months
+  const columns = [
+    { key: 'category', label: 'Category', className: 'text-left' },
+    ...months.map(month => ({ key: month, label: month, className: 'text-center min-w-[100px]' })),
+  ];
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">NIV Bundle Compliance</h3>
-        <div className="text-sm text-gray-500">Last 6 months</div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 font-medium text-gray-900 bg-gray-50">Category</th>
-              {months.map(month => (
-                <th key={month} className="text-center py-3 px-4 font-medium text-gray-900 bg-gray-50 min-w-[100px]">
-                  {month}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {complianceData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="py-3 px-4 font-medium text-gray-900">{row.category}</td>
-                {months.map(month => (
-                  <td key={month} className="py-3 px-4 text-center">
-                    <span className={`inline-block px-2 py-1 rounded-md text-sm font-medium ${getComplianceColor(row[month])}`}>
-                      {row[month]}
-                    </span>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-          <div className="font-semibold text-blue-900 mb-1">General Precautions</div>
-          <div className="text-blue-700">
-            • Appropriate size prongs/mask<br />
-            • Skin barrier application<br />
-            • Gap between nasal septum and prong<br />
-            • Preventing skin blanching and trauma<br />
-            • Proper securing of prongs and circuit<br />
-            • Gentle massage and humidification
-          </div>
-        </div>
-        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-          <div className="font-semibold text-purple-900 mb-1">Ventilation Type Specific</div>
-          <div className="text-purple-700">
-            <span className="font-medium">CPAP:</span> Fitting, bubbling present<br />
-            <span className="font-medium">NIPPV:</span> Interface fitting<br />
-            <span className="font-medium">HFNC:</span> Nares coverage (50%)
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-green-100 rounded"></div>
-            <span>≥90% Excellent</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-yellow-100 rounded"></div>
-            <span>80-89% Good</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-orange-100 rounded"></div>
-            <span>70-79% Fair</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-red-100 rounded"></div>
-            <span>&lt;70% Poor</span>
-          </div>
-        </div>
-        <div>
-          Based on NIV safety guidelines
-        </div>
-      </div>
-    </div>
+    <ComplianceTable
+      title="NIV Bundle Compliance"
+      subtitle="Last 6 months"
+      columns={columns}
+      data={complianceData}
+      loading={loading}
+      getCellClass={getComplianceColor}
+      emptyMessage={
+        <>
+          No NIV audit data available for the selected period.<br />
+          <small>Complete some NIV audits to see compliance trends.</small>
+        </>
+      }
+      legend={legend}
+      footer={footer}
+    />
   );
 };
 
