@@ -18,7 +18,6 @@ const initialState = {
 
 const CreateUserModal = ({ open, onClose }) => {
   const profile = useSelector((state) => state.user.userDetails)
-  console.log("🚀 ~ CreateUserModal ~ profile:", profile)
   const [fields, setFields] = useState(initialState);
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState({});

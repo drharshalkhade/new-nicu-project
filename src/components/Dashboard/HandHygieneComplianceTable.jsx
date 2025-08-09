@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import ComplianceTable from '../common-components/ComplianceTable';
 
@@ -61,75 +60,9 @@ const getComplianceColor = (category, value) => {
 };
 
 const HandHygieneComplianceTable = () => {
-  const userDetails = useSelector((state) => state.user.userDetails);
-  const [complianceData, setComplianceData] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (userDetails?.organization_id) {
-      fetchHandHygieneCompliance();
-    }
-  }, [userDetails?.organization_id]);
-
-  const fetchHandHygieneCompliance = async () => {
-    try {
-      setLoading(true);
-      const results = [];
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const month = date.toLocaleDateString('en-US', { month: 'long' });
-        const startDate = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-        const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
-        const monthlyCompliance = await getMonthlyHandHygieneCompliance(startDate, endDate);
-        results.push({
-          month,
-          adequate: monthlyCompliance.adequate,
-          needsImprovement: monthlyCompliance.needsImprovement,
-          noHandHygiene: monthlyCompliance.noHandHygiene,
-        });
-      }
-      setComplianceData(results);
-    } catch (error) {
-      console.error('Error fetching hand hygiene compliance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Simulated async data fetch with improvement trend & randomness
-  const getMonthlyHandHygieneCompliance = async (startDate) => {
-    try {
-      const date = new Date(startDate);
-      const monthIndex = date.getMonth();
-      const currentMonth = new Date().getMonth();
-      const monthsAgo = (currentMonth - monthIndex + 12) % 12;
-      if (monthsAgo > 5) {
-        return { adequate: '0.00%', needsImprovement: '0.00%', noHandHygiene: '0.00%' };
-      }
-      // Base values moving towards improvement
-      const baseAdequate = 15 + monthsAgo * 5;
-      const baseNeeds = 45 + (5 - monthsAgo) * 5;
-      const baseNoHH = 40 - monthsAgo * 5;
-      // Add small random variation +/-5%
-      let adequate = baseAdequate + (Math.random() * 10 - 5);
-      let needsImprovement = baseNeeds + (Math.random() * 10 - 5);
-      let noHandHygiene = baseNoHH + (Math.random() * 10 - 5);
-      // Clamp values to >= 0
-      adequate = Math.max(0, adequate);
-      needsImprovement = Math.max(0, needsImprovement);
-      noHandHygiene = Math.max(0, noHandHygiene);
-      const total = adequate + needsImprovement + noHandHygiene;
-      return {
-        adequate: ((adequate / total) * 100).toFixed(2) + '%',
-        needsImprovement: ((needsImprovement / total) * 100).toFixed(2) + '%',
-        noHandHygiene: ((noHandHygiene / total) * 100).toFixed(2) + '%',
-      };
-    } catch (error) {
-      console.error('Error in getMonthlyHandHygieneCompliance:', error);
-      return { adequate: '0.00%', needsImprovement: '0.00%', noHandHygiene: '0.00%' };
-    }
-  };
+  const { dashboardData, initialized } = useSelector(state => state.audit);
+  const complianceData = dashboardData.handHygiene || [];
+  const loading = !initialized;
 
   return (
     <ComplianceTable

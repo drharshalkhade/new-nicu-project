@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import ComplianceTable from '../common-components/ComplianceTable';
 
@@ -61,80 +60,24 @@ const getComplianceColor = (category, value) => {
 };
 
 const HandWashComplianceTable = () => {
-  const userDetails = useSelector(state => state.user.userDetails);
-  const [complianceData, setComplianceData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { dashboardData, initialized } = useSelector(state => state.audit);
+  const handWashData = dashboardData.handWash || [];
+  const loading = !initialized;
 
-  useEffect(() => {
-    if (userDetails?.organization_id) {
-      fetchHandWashCompliance();
-    }
-  }, [userDetails?.organization_id]);
-
-  const fetchHandWashCompliance = async () => {
-    try {
-      setLoading(true);
-      const results = [];
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const month = date.toLocaleDateString('en-US', { month: 'long' });
-        const startDate = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-        const monthlyCompliance = await getMonthlyHandWashCompliance(startDate);
-        results.push({
-          month,
-          adequate: monthlyCompliance.adequate,
-          needsImprovement: monthlyCompliance.needsImprovement,
-          poor: monthlyCompliance.poor,
-        });
-      }
-      setComplianceData(results);
-    } catch (error) {
-      console.error('Error fetching hand wash compliance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Simulated async data fetch with improvement trend & randomness
-  const getMonthlyHandWashCompliance = async (startDate) => {
-    try {
-      const date = new Date(startDate);
-      const monthIndex = date.getMonth();
-      const currentMonth = new Date().getMonth();
-      const monthsAgo = (currentMonth - monthIndex + 12) % 12;
-      if (monthsAgo > 5) {
-        return { adequate: '0.00%', needsImprovement: '0.00%', poor: '0.00%' };
-      }
-      // Base values moving towards improvement
-      const baseAdequate = 35 + monthsAgo * 7;
-      const baseNeeds = 40 - monthsAgo * 3;
-      const basePoor = 25 - monthsAgo * 4;
-      // Random variation +/-5%, +/-4%, +/-3%
-      let adequate = baseAdequate + (Math.random() * 10 - 5);
-      let needsImprovement = baseNeeds + (Math.random() * 8 - 4);
-      let poor = basePoor + (Math.random() * 6 - 3);
-      adequate = Math.max(0, adequate);
-      needsImprovement = Math.max(0, needsImprovement);
-      poor = Math.max(0, poor);
-      const total = adequate + needsImprovement + poor;
-      return {
-        adequate: ((adequate / total) * 100).toFixed(2) + '%',
-        needsImprovement: ((needsImprovement / total) * 100).toFixed(2) + '%',
-        poor: ((poor / total) * 100).toFixed(2) + '%',
-      };
-    } catch (error) {
-      console.error('Error in getMonthlyHandWashCompliance:', error);
-      return { adequate: '0.00%', needsImprovement: '0.00%', poor: '0.00%' };
-    }
-  };
+  // Transform data to match expected format
+  const transformedData = handWashData.map(item => ({
+    month: item.month,
+    adequate: item.compliance > 0.8 ? `${(item.compliance * 100).toFixed(2)}%` : '0.00%',
+    needsImprovement: item.compliance > 0.6 && item.compliance <= 0.8 ? `${(item.compliance * 100).toFixed(2)}%` : '0.00%',
+    poor: item.compliance <= 0.6 ? `${(item.compliance * 100).toFixed(2)}%` : '0.00%',
+  }));
 
   return (
     <ComplianceTable
       title="Hand Wash Compliance by Month"
       subtitle="SUMANK Protocol Assessment"
       columns={columns}
-      data={complianceData}
+      data={transformedData}
       loading={loading}
       getCellClass={getComplianceColor}
       emptyMessage={

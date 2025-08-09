@@ -41,7 +41,7 @@ const glovesRequiredForOptions = [
   'IV line insertion',
   'Central line insertion',
   'Central line Maintenance',
-  'Drug administration/preparation',
+  'Drug administration',
   'Other',
 ];
 
@@ -232,7 +232,7 @@ const HandHygieneForm = () => {
 
           {/* Healthcare Provider Type */}
           <Form.Item
-            label="Healthcare Provider Type"
+            label="Healthcare Provider (HCP)*"
             name="hcp"
             rules={[{ required: true, message: 'Please select at least one healthcare provider' }]}
           >
@@ -247,7 +247,7 @@ const HandHygieneForm = () => {
 
           {/* WHO 5 Moments */}
           <Form.Item
-            label="Type of Opportunity (WHO 5 Moments)"
+            label="Type of Opportunity*"
             name="opportunityType"
             rules={[{ required: true, message: 'Please select at least one moment' }]}
           >
@@ -263,11 +263,11 @@ const HandHygieneForm = () => {
           {/* Technique Assessment */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Form.Item
-              label="Adherence to Technique (Number of Steps)"
+              label="Adherence to Technique: Number of Steps*"
               name="adherenceSteps"
               rules={[{ required: true, message: 'Please select your adherence steps' }]}
             >
-              <Radio.Group>
+              <Radio.Group className="flex space-x-8">
                 {adherenceStepsOptions.map(option => (
                   <Radio key={option} value={option}>
                     {option}
@@ -276,11 +276,11 @@ const HandHygieneForm = () => {
               </Radio.Group>
             </Form.Item>
             <Form.Item
-              label="Time Duration of Hand Rub"
+              label="Time Duration of Hand Rub*"
               name="handRubDuration"
               rules={[{ required: true, message: 'Please select hand rub duration' }]}
             >
-              <Radio.Group>
+              <Radio.Group className="flex space-x-8">
                 {handRubDurationOptions.map(option => (
                   <Radio key={option} value={option}>
                     {option}
@@ -341,7 +341,7 @@ const HandHygieneForm = () => {
               </Radio.Group>
             </Form.Item>
             <Form.Item
-              label="Notified Bedside"
+              label="Notified Bedside*"
               name="notifiedBedside"
               rules={[{ required: true, message: 'Please select an option' }]}
             >
@@ -365,12 +365,12 @@ const HandHygieneForm = () => {
           />
 
           {/* Comments */}
-          <Form.Item label="Comments" name="comments">
+          <Form.Item label="Any Comments" name="comments">
             <TextArea rows={4} placeholder="Enter any additional observations or comments..." />
           </Form.Item>
 
           {/* Image Upload */}
-          <Form.Item label="Upload Image">
+          <Form.Item label="Upload Image if any*">
             <input
               type="file"
               accept="image/*"

@@ -67,6 +67,7 @@ const CLABSIForm = () => {
         type: 'clabsi',
         patientName: values.patientName,
         nicuAreaId: values.nicuAreaId,
+        hospitalName: values.hospitalName,
         staffName: values.staffName,
         bundleType: values.bundleChecklist,
         bundleData: values,
@@ -135,7 +136,7 @@ const CLABSIForm = () => {
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Form.Item
-              label="Patient Name"
+              label="Patient Name *"
               name="patientName"
               rules={[{ required: true, message: 'Please enter patient name' }]}
             >
@@ -147,28 +148,45 @@ const CLABSIForm = () => {
             </Form.Item>
 
             <Form.Item
-              label="NICU Area"
-              name="nicuAreaId"
+              label="Hospital Name *"
+              name="hospitalName"
               rules={[{ required: true, message: 'Please select NICU area' }]}
             >
               {loadingAreas ? (
                 <Spin />
               ) : (
-                <Select placeholder="Select NICU Area" allowClear>
+                <Select 
+                  placeholder="Select NICU Area" 
+                  allowClear
+                  onChange={(value, option) => {
+                    const selectedArea = nicuAreas.find(area => area.name === value);
+                    if (selectedArea) {
+                      form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                    }
+                  }}
+                >
                   {nicuAreas.map(area => (
-                    <Option key={area.id} value={area.id}>
+                    <Option key={area.id} value={area.name}>
                       {area.name}
                     </Option>
                   ))}
                 </Select>
               )}
             </Form.Item>
+            <Form.Item
+              label="NICU Area Id"
+              name="nicuAreaId"
+              rules={[{ required: true, message: 'NICU Area ID is required' }]}
+              hidden
+            >
+              <Input disabled />
+            </Form.Item>
           </div>
 
           {/* Bundle Selection */}
           <div className="bg-purple-50 p-6 rounded-lg">
             <Form.Item
-              label="Bundle Checklist"
+              label="Bundle Checklist *"
               name="bundleChecklist"
               rules={[{ required: true, message: 'Please select a bundle checklist' }]}
             >
@@ -202,7 +220,7 @@ const CLABSIForm = () => {
                 {/* Basic Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Form.Item
-                    label="Indication"
+                    label="Indication *"
                     name="indication"
                     rules={[{ required: true, message: 'Please enter indication' }]}
                   >
@@ -210,11 +228,11 @@ const CLABSIForm = () => {
                   </Form.Item>
                   
                   <Form.Item
-                    label="Elective/Emergency"
+                    label="Elective/Emergency *"
                     name="electiveEmergency"
                     rules={[{ required: true, message: 'Please select type' }]}
                   >
-                    <Radio.Group>
+                    <Radio.Group className="flex space-x-8">
                       {['Elective', 'Emergency'].map(option => (
                         <Radio key={option} value={option}>
                           {option}
@@ -227,20 +245,22 @@ const CLABSIForm = () => {
                 {/* Yes/No Fields */}
                 <div className="space-y-4">
                   {[
-                    { key: 'suppliesArranged', label: 'Supplies/Equipment arranged' },
-                    { key: 'washHandsDuring', label: 'Wash hands with soap and water f/b Hand Rub (As per policy)' },
-                    { key: 'ppeAsepsis', label: 'PPE and strict asepsis (Cap, Mask, Gloves, Gown, Drape)' },
-                    { key: 'checkEquipment', label: 'Check Equipment / Sterile Tray' },
-                    { key: 'allLumensFlushed', label: 'All Lumens Flushed' },
-                    { key: 'sitePreparation', label: 'Appropriate Site preparation' },
-                    { key: 'asepticPrecautions', label: 'Strict aseptic precautions' },
-                    { key: 'appropriateSteps', label: 'Appropriate steps followed' },
-                    { key: 'numberOfPricks', label: 'Number of Pricks < or = 2' },
-                    { key: 'haemostasisAchieved', label: 'Haemostasis Achieved' },
-                    { key: 'fixedWithPad', label: 'Fixed with sterile Pad' },
-                    { key: 'needleFreeConnector', label: 'Needle free connector used' },
-                    { key: 'handwashAfterGloves', label: 'Handwash or hand rub after removing gloves' },
-                    { key: 'ultrasoundGuidance', label: 'Ultrasound Guidance Used' }
+                    { key: 'suppliesArranged', label: 'Supplies/Equipment arranged *' },
+                    { key: 'twoPeopleInvolved', label: '2 People involved *' },
+                    { key: 'measurementDone', label: 'Measurement done *' },
+                    { key: 'washHandsDuring', label: 'Wash hands with soap and water f/b Hand Rub (As per policy) *' },
+                    { key: 'ppeAsepsis', label: 'PPE and strict asepsis (Cap, Mask, Gloves, Gown, Drape) *' },
+                    { key: 'checkEquipment', label: 'Check Equipment / Sterile Tray *' },
+                    { key: 'allLumensFlushed', label: 'All Lumens Flushed *' },
+                    { key: 'sitePreparation', label: 'Appropriate Site preparation *' },
+                    { key: 'asepticPrecautions', label: 'Strict aseptic precautions *' },
+                    { key: 'appropriateSteps', label: 'Appropriate steps followed *' },
+                    { key: 'numberOfPricks', label: 'Number of Pricks < or = 2 *' },
+                    { key: 'haemostasisAchieved', label: 'Haemostasis Achieved *' },
+                    { key: 'fixedWithPad', label: 'Fixed with sterile Pad *' },
+                    { key: 'needleFreeConnector', label: 'Needle free connector used *' },
+                    { key: 'handwashAfterGloves', label: 'Handwash or hand rub after removing gloves *' },
+                    { key: 'ultrasoundGuidance', label: 'Ultrasound Guidance Used *' }
                   ].map((field) => (
                     <div key={field.key} className="bg-white p-4 rounded-md border border-gray-200">
                       <Form.Item
@@ -265,7 +285,7 @@ const CLABSIForm = () => {
                 {/* Categorical Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Form.Item
-                    label="Catheter types"
+                    label="Catheter types *"
                     name="catheterTypes"
                     rules={[{ required: true, message: 'Please select catheter type' }]}
                   >
@@ -279,12 +299,43 @@ const CLABSIForm = () => {
                   </Form.Item>
 
                   <Form.Item
-                    label="Site"
+                    label="Site *"
                     name="site"
                     rules={[{ required: true, message: 'Please select site' }]}
                   >
                     <Radio.Group>
                       {['Umbilical', 'Peripheral', 'Femoral', 'IJV', 'Subclavian'].map(option => (
+                        <Radio key={option} value={option}>
+                          {option}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
+
+                {/* Additional Categorical Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Form.Item
+                    label="Side *"
+                    name="side"
+                    rules={[{ required: true, message: 'Please select side' }]}
+                  >
+                    <Radio.Group>
+                      {['Right', 'Left', 'NA'].map(option => (
+                        <Radio key={option} value={option}>
+                          {option}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Limb *"
+                    name="limb"
+                    rules={[{ required: true, message: 'Please select limb' }]}
+                  >
+                    <Radio.Group>
+                      {['Upper', 'Lower', 'NA'].map(option => (
                         <Radio key={option} value={option}>
                           {option}
                         </Radio>
@@ -310,21 +361,37 @@ const CLABSIForm = () => {
                   </Form.Item>
 
                   <Form.Item
-                    label="Fixed at ____ cm"
+                    label="Repositioning Required *"
+                    name="repositioningRequired"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      {['Yes', 'No'].map(option => (
+                        <Radio key={option} value={option}>
+                          {option}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Form.Item
+                    label="Fixed at ____ cm *"
                     name="fixedAt"
                     rules={[{ required: true, message: 'Please enter depth' }]}
                   >
                     <Input placeholder="Enter depth in cm" />
                   </Form.Item>
-                </div>
 
-                <Form.Item
-                  label="Date/Time of insertion"
-                  name="dateTimeInsertion"
-                  rules={[{ required: true, message: 'Please enter date and time' }]}
-                >
-                  <Input type="datetime-local" />
-                </Form.Item>
+                  <Form.Item
+                    label="Date/Time of insertion *"
+                    name="dateTimeInsertion"
+                    rules={[{ required: true, message: 'Please enter date and time' }]}
+                  >
+                    <Input type="datetime-local" />
+                  </Form.Item>
+                </div>
               </div>
             )}
           </div>
@@ -344,39 +411,39 @@ const CLABSIForm = () => {
               )}
             </button>
             
-            {expandedSections.maintenance && (
-              <div className="p-6 border-t border-gray-200 space-y-4">
-                {[
-                  { key: 'washHandsMaintenance', label: 'Wash hands with soap and water f/b Hand Rub (As per policy)' },
-                  { key: 'assessedNeed', label: 'Assessed the need of central lines' },
-                  { key: 'sterileDressing', label: 'Used sterile semipermeable dressing and is intact' },
-                  { key: 'eachLumenFlushed', label: 'Each lumen flushed' },
-                  { key: 'noErythema', label: 'No Signs of Erythema / Infection' },
-                  { key: 'washHandsHubCare', label: 'Hub Care: Wash hands with soap and water f/b Hand Rub' },
-                  { key: 'wearSterileGloves', label: 'Wear sterile gloves' },
-                  { key: 'scrubPort', label: 'Scrub access port for 15s & allow it to dry' },
-                  { key: 'sterileField', label: 'Sterile field maintained' }
-                ].map((field) => (
-                  <div key={field.key} className="bg-white p-4 rounded-md border border-gray-200">
-                    <Form.Item
-                      label={field.label}
-                      name={field.key}
-                      rules={[{ required: true, message: 'Please select an option' }]}
-                    >
-                      <Radio.Group className="flex space-x-8">
-                        {['Yes', 'No'].map(option => (
-                          <Radio key={option} value={option}>
-                            <span className={option === 'Yes' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
-                              {option}
-                            </span>
-                          </Radio>
-                        ))}
-                      </Radio.Group>
-                    </Form.Item>
-                  </div>
-                ))}
-              </div>
-            )}
+                          {expandedSections.maintenance && (
+                <div className="p-6 border-t border-gray-200 space-y-4">
+                  {[
+                    { key: 'washHandsMaintenance', label: 'Wash hands with soap and water f/b Hand Rub (As per policy) *' },
+                    { key: 'assessedNeed', label: 'Assessed the need of central lines *' },
+                    { key: 'sterileDressing', label: 'Used sterile semipermeable dressing and is intact *' },
+                    { key: 'eachLumenFlushed', label: 'Each lumen flushed *' },
+                    { key: 'noErythema', label: 'No Signs of Erythema / Infection *' },
+                    { key: 'washHandsHubCare', label: 'Hub Care: Wash hands with soap and water f/b Hand Rub (As per policy) *' },
+                    { key: 'wearSterileGloves', label: 'Wear sterile gloves *' },
+                    { key: 'scrubPort', label: 'Scrub access port for 15s & allow it to dry *' },
+                    { key: 'sterileField', label: 'Sterile field maintained *' }
+                  ].map((field) => (
+                    <div key={field.key} className="bg-white p-4 rounded-md border border-gray-200">
+                      <Form.Item
+                        label={field.label}
+                        name={field.key}
+                        rules={[{ required: true, message: 'Please select an option' }]}
+                      >
+                        <Radio.Group className="flex space-x-8">
+                          {['Yes', 'No'].map(option => (
+                            <Radio key={option} value={option}>
+                              <span className={option === 'Yes' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                                {option}
+                              </span>
+                            </Radio>
+                          ))}
+                        </Radio.Group>
+                      </Form.Item>
+                    </div>
+                  ))}
+                </div>
+              )}
           </div>
 
           {/* Removal Bundle */}
@@ -394,53 +461,53 @@ const CLABSIForm = () => {
               )}
             </button>
             
-            {expandedSections.removal && (
-              <div className="p-6 border-t border-gray-200 space-y-6">
-                <Form.Item
-                  label="Date of Removal"
-                  name="dateOfRemoval"
-                  rules={[{ required: true, message: 'Please enter date of removal' }]}
-                >
-                  <Input type="date" />
-                </Form.Item>
+                          {expandedSections.removal && (
+                <div className="p-6 border-t border-gray-200 space-y-6">
+                  <Form.Item
+                    label="Date of Removal *"
+                    name="dateOfRemoval"
+                    rules={[{ required: true, message: 'Please enter date of removal' }]}
+                  >
+                    <Input type="date" />
+                  </Form.Item>
 
-                <Form.Item
-                  label="Reason for Removal"
-                  name="reasonForRemoval"
-                  rules={[{ required: true, message: 'Please select reason for removal' }]}
-                >
-                  <Radio.Group>
-                    {[
-                      'Insertion outside',
-                      'Suspected/Confirmed infection at central line insertion site',
-                      'Patient no longer needs central line',
-                      'Central line blocked/not working',
-                      'Reached maximum days'
-                    ].map(option => (
-                      <Radio key={option} value={option}>
-                        {option}
-                      </Radio>
-                    ))}
-                  </Radio.Group>
-                </Form.Item>
-
-                <Form.Item
-                  label="Tip culture sent"
-                  name="tipCultureSent"
-                  rules={[{ required: true, message: 'Please select an option' }]}
-                >
-                  <Radio.Group className="flex space-x-8">
-                    {['Yes', 'No'].map(option => (
-                      <Radio key={option} value={option}>
-                        <span className={option === 'Yes' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                  <Form.Item
+                    label="Reason for Removal *"
+                    name="reasonForRemoval"
+                    rules={[{ required: true, message: 'Please select reason for removal' }]}
+                  >
+                    <Radio.Group>
+                      {[
+                        'Insertion outside',
+                        'Suspected/Confirmed infection at central line insertion site',
+                        'Patient no longer needs central line',
+                        'Central line blocked/not working',
+                        'Reached maximum days'
+                      ].map(option => (
+                        <Radio key={option} value={option}>
                           {option}
-                        </span>
-                      </Radio>
-                    ))}
-                  </Radio.Group>
-                </Form.Item>
-              </div>
-            )}
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Tip culture sent *"
+                    name="tipCultureSent"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      {['Yes', 'No'].map(option => (
+                        <Radio key={option} value={option}>
+                          <span className={option === 'Yes' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                            {option}
+                          </span>
+                        </Radio>
+                      ))}
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
+              )}
           </div>
 
           {/* Compliance Display */}

@@ -69,7 +69,7 @@ const NIVForm = () => {
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
         staffRole: 'NIV Audit',
-        nicuArea: nicuAreas.find((area) => area.id === values.nicuAreaId)?.name || 'Unknown Area',
+        nicuArea: values.hospitalName || 'Unknown Area',
         nicuAreaId: values.nicuAreaId,
         moments: {
           beforePatientContact: false,
@@ -81,7 +81,7 @@ const NIVForm = () => {
         compliance: calculateNIVCompliance(values).score / 100,
         notes: `NIV ${values.respiratorySupport} Audit - Patient: ${values.patientName}`,
         patientName: values.patientName,
-        staffName: values.staffName,
+        bedsideStaffName: values.bedsideStaffName,
         auditType: 'NIV',
         respiratorySupport: values.respiratorySupport,
         nivData: values,
@@ -149,37 +149,54 @@ const NIVForm = () => {
           {/* Basic Information */}
           <div className="bg-gray-50 p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
             <Form.Item
-              label="Patient Name"
+              label="Patient Name *"
               name="patientName"
               rules={[{ required: true, message: 'Please enter patient name' }]}
             >
               <Input placeholder="Enter patient name" />
             </Form.Item>
-            <Form.Item label="Staff Name" name="staffName">
-              <Input placeholder="Enter staff name" />
+            <Form.Item label="Bedside Staff Name" name="bedsideStaffName">
+              <Input placeholder="Enter bedside staff name" />
             </Form.Item>
             <Form.Item
-              label="NICU Area"
-              name="nicuAreaId"
+              label="Hospital Name"
+              name="hospitalName"
               rules={[{ required: true, message: 'Please select NICU Area' }]}
             >
               {loadingAreas ? (
                 <Spin />
               ) : (
-                <Select placeholder="Select NICU Area" allowClear>
+                <Select 
+                  placeholder="Select NICU Area" 
+                  allowClear
+                  onChange={(value, option) => {
+                    const selectedArea = nicuAreas.find(area => area.name === value);
+                    if (selectedArea) {
+                      form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                    }
+                  }}
+                >
                   {nicuAreas.map((area) => (
-                    <Option key={area.id} value={area.id}>
+                    <Option key={area.id} value={area.name}>
                       {area.name}
                     </Option>
                   ))}
                 </Select>
               )}
             </Form.Item>
+            <Form.Item
+              label="NICU Area Id"
+              name="nicuAreaId"
+              rules={[{ required: true, message: 'NICU Area ID is required' }]}
+              hidden
+            >
+              <Input disabled />
+            </Form.Item>
           </div>
 
           {/* Common Questions / Respiratory Support */}
           <Form.Item
-            label="Type of Respiratory Support"
+            label="Type of Respiratory Support *"
             name="respiratorySupport"
             rules={[{ required: true, message: 'Please select respiratory support type' }]}
           >
@@ -196,16 +213,17 @@ const NIVForm = () => {
           {/* Common Section */}
           {expandedSections.common && (
             <div className="bg-purple-50 rounded-lg p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-purple-900 mb-4">Common Questions</h3>
               {[
-                { key: 'appropriateSize', label: 'Appropriate size prongs / mask used' },
-                { key: 'skinBarrier', label: 'Skin barrier applied - hydrocolloid/silicon barrier' },
-                { key: 'gapNasalSeptum', label: '2 mm gap between nasal septum and prong/septum' },
-                { key: 'skinBlanched', label: 'Skin on nasal septum blanched' },
-                { key: 'prongsSecured', label: 'Prongs secured with tape to reduce movement' },
-                { key: 'tractionInterface', label: 'Traction on the interface' },
-                { key: 'circuitSecured', label: 'Circuit is supported and secured' },
-                { key: 'gentleMassage', label: 'Gentle massage of nasal septum and bridge done in past 24 hours' },
-                { key: 'humidification', label: 'Humidification is on' },
+                { key: 'appropriateSize', label: 'Appropriate size prongs / mask used *' },
+                { key: 'skinBarrier', label: 'Skin barrier applied- hydrocolloid/silicon barrier (Tegaderm is an alternative) *' },
+                { key: 'gapNasalSeptum', label: '2 mm gap between nasal septum and the prong/ septum *' },
+                { key: 'skinBlanched', label: 'Skin on nasal septum blanched *' },
+                { key: 'prongsSecured', label: 'Prongs secured with a tape - to reduce moment *' },
+                { key: 'tractionInterface', label: 'Traction on the interface *' },
+                { key: 'circuitSecured', label: 'Circuit is supported and secured *' },
+                { key: 'gentleMassage', label: 'Gentle massage of nasal septum and bridge done in past 24 hours *' },
+                { key: 'humidification', label: 'Humidification is on *' },
               ].map(({ key, label }) => (
                 <Form.Item
                   key={key}
@@ -220,7 +238,7 @@ const NIVForm = () => {
                 </Form.Item>
               ))}
               <Form.Item
-                label="Nasal Trauma"
+                label="Nasal septum trauma *"
                 name="nasalTrauma"
                 rules={[{ required: true, message: 'Please select nasal trauma assessment' }]}
               >
@@ -232,14 +250,36 @@ const NIVForm = () => {
                   ))}
                 </Radio.Group>
               </Form.Item>
+              
+              {/* Audit Image Upload */}
+              <Form.Item label="Audit Image" name="auditImage">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      form.setFieldsValue({ auditImage: file });
+                    }
+                  }}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </Form.Item>
             </div>
           )}
 
           {/* CPAP Section */}
           {expandedSections.cpap && (
             <div className="bg-purple-50 rounded-lg p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-purple-900 mb-4">CPAP</h3>
+              
+              {/* Description (optional) */}
+              <Form.Item label="Description (optional)" name="cpapDescription">
+                <Input.TextArea rows={3} placeholder="Enter CPAP description..." />
+              </Form.Item>
+              
               <Form.Item
-                label="Type of CPAP"
+                label="Type of CPAP *"
                 name="typeOfCPAP"
                 rules={[{ required: true, message: 'Please select CPAP type' }]}
               >
@@ -252,7 +292,7 @@ const NIVForm = () => {
                 </Radio.Group>
               </Form.Item>
               <Form.Item
-                label="Nasal Interface CPAP"
+                label="Nasal Interface used *"
                 name="nasalInterfaceCPAP"
                 rules={[{ required: true, message: 'Please select nasal interface' }]}
               >
@@ -271,25 +311,19 @@ const NIVForm = () => {
                 </Radio.Group>
               </Form.Item>
               <Form.Item
-                label="Snug Fit CPAP"
+                label="Snugly fitting prongs, (If Rams cannula 80% of nares covered) (Checked with the camera focused and ascertained) *"
                 name="snugFitCPAP"
                 rules={[{ required: true, message: 'Please specify snug fit' }]}
               >
-                <Radio.Group>
-                  {['Yes', 'No'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
+                <Radio.Group className="flex space-x-8">
+                  <Radio value="Yes">Yes</Radio>
+                  <Radio value="No">No</Radio>
                 </Radio.Group>
               </Form.Item>
-              <Form.Item label="Bubbling Present" name="bubblingPresent">
-                <Radio.Group>
-                  {['Yes', 'No'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
+              <Form.Item label="Bubbling present (for bubble CPAP)" name="bubblingPresent">
+                <Radio.Group className="flex space-x-8">
+                  <Radio value="Yes">Yes</Radio>
+                  <Radio value="No">No</Radio>
                 </Radio.Group>
               </Form.Item>
             </div>
@@ -298,8 +332,15 @@ const NIVForm = () => {
           {/* NIPPV Section */}
           {expandedSections.nippv && (
             <div className="bg-purple-50 rounded-lg p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-purple-900 mb-4">NIPPV</h3>
+              
+              {/* Description (optional) */}
+              <Form.Item label="Description (optional)" name="nippvDescription">
+                <Input.TextArea rows={3} placeholder="Enter NIPPV description..." />
+              </Form.Item>
+              
               <Form.Item
-                label="Nasal Interface NIPPV"
+                label="Nasal Interface used *"
                 name="nasalInterfaceNIPPV"
                 rules={[{ required: true, message: 'Please select nasal interface' }]}
               >
@@ -312,16 +353,13 @@ const NIVForm = () => {
                 </Radio.Group>
               </Form.Item>
               <Form.Item
-                label="Snug Fit NIPPV"
+                label="Snugly fitting prongs, (If Rams cannula 80% of nares covered) (Checked with the camera focused and ascertained) *"
                 name="snugFitNIPPV"
                 rules={[{ required: true, message: 'Please specify snug fit' }]}
               >
-                <Radio.Group>
-                  {['Yes', 'No'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
+                <Radio.Group className="flex space-x-8">
+                  <Radio value="Yes">Yes</Radio>
+                  <Radio value="No">No</Radio>
                 </Radio.Group>
               </Form.Item>
             </div>
@@ -330,8 +368,15 @@ const NIVForm = () => {
           {/* HFNC Section */}
           {expandedSections.hfnc && (
             <div className="bg-purple-50 rounded-lg p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-purple-900 mb-4">HFNC</h3>
+              
+              {/* Description (optional) */}
+              <Form.Item label="Description (optional)" name="hfncDescription">
+                <Input.TextArea rows={3} placeholder="Enter HFNC description..." />
+              </Form.Item>
+              
               <Form.Item
-                label="Nasal Interface HFNC"
+                label="Nasal Interface used *"
                 name="nasalInterfaceHFNC"
                 rules={[{ required: true, message: 'Please select nasal interface' }]}
               >
@@ -344,16 +389,13 @@ const NIVForm = () => {
                 </Radio.Group>
               </Form.Item>
               <Form.Item
-                label="50% of Nares Covered HFNC"
+                label="50% of Nares Covered by Nasal Prongs (Checked with the camera focused and ascertained) *"
                 name="naresCoveredHFNC"
                 rules={[{ required: true, message: 'Please indicate coverage' }]}
               >
-                <Radio.Group>
-                  {['Yes', 'No'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
+                <Radio.Group className="flex space-x-8">
+                  <Radio value="Yes">Yes</Radio>
+                  <Radio value="No">No</Radio>
                 </Radio.Group>
               </Form.Item>
             </div>

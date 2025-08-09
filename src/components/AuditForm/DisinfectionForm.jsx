@@ -109,11 +109,11 @@ const DisinfectionForm = () => {
         time: new Date().toTimeString().slice(0, 5),
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
-        nicuArea: nicuAreas.find((a) => a.id === values.nicuArea)?.name || 'Unknown',
-        nicuAreaId: values.nicuArea,
+        nicuArea: values.hospitalName || 'Unknown',
+        nicuAreaId: values.nicuAreaId,
         taskType: values.taskType,
         taskValues: Object.fromEntries(
-          Object.entries(values).filter(([key]) => key !== 'nicuArea' && key !== 'taskType')
+          Object.entries(values).filter(([key]) => key !== 'hospitalName' && key !== 'nicuAreaId' && key !== 'taskType')
         ),
         complianceScore: complianceObj.score,
         complianceLevel: complianceObj,
@@ -154,7 +154,7 @@ const DisinfectionForm = () => {
                 className="text-orange-100 hover:text-white"
               />
               <div>
-                <h1 className="text-white text-2xl font-bold">Disinfection Audit</h1>
+                <h1 className="text-white text-2xl font-bold">Disinfection Audits</h1>
                 <p className="text-orange-100 text-sm">2025 - Equipment and Environment Disinfection</p>
               </div>
             </div>
@@ -175,35 +175,61 @@ const DisinfectionForm = () => {
             {/* Basic Info */}
             <div className="bg-gray-50 p-6 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Form.Item label="Email" name="email" initialValue={user?.email} hidden>
+                <Form.Item 
+                  label="Email *" 
+                  name="email" 
+                  initialValue={user?.email}
+                  rules={[{ required: true, message: 'Email is required' }]}
+                >
                   <Input disabled />
                 </Form.Item>
-                <Form.Item label="Staff Name" name="staffName">
-                  <Input placeholder="Enter staff name" />
+                <Form.Item 
+                  label="Name of Staff / Supervisor *" 
+                  name="staffName"
+                  rules={[{ required: true, message: 'Please enter staff/supervisor name' }]}
+                >
+                  <Input placeholder="Enter staff/supervisor name" />
                 </Form.Item>
                 <Form.Item
-                  label="NICU Area"
-                  name="nicuArea"
+                  label="Hospital Name *"
+                  name="hospitalName"
                   rules={[{ required: true, message: 'Please select a NICU area' }]}
                 >
                   {loadingAreas ? (
                     <Spin />
                   ) : (
-                    <Select placeholder="Select NICU area" allowClear>
+                    <Select 
+                      placeholder="Select NICU area" 
+                      allowClear
+                      onChange={(value, option) => {
+                        const selectedArea = nicuAreas.find(area => area.name === value);
+                        if (selectedArea) {
+                          form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                        }
+                      }}
+                    >
                       {nicuAreas.map((area) => (
-                        <Option key={area.id} value={area.id}>
+                        <Option key={area.id} value={area.name}>
                           {area.name}
                         </Option>
                       ))}
                     </Select>
                   )}
                 </Form.Item>
+                <Form.Item
+                  label="NICU Area Id"
+                  name="nicuAreaId"
+                  rules={[{ required: true, message: 'NICU Area ID is required' }]}
+                  hidden
+                >
+                  <Input disabled />
+                </Form.Item>
               </div>
             </div>
 
             {/* Task Type */}
             <Form.Item
-              label="Task Type"
+              label="Select Task Type *"
               name="taskType"
               rules={[{ required: true, message: 'Please select a task type' }]}
             >

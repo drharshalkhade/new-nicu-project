@@ -1,73 +1,77 @@
-import { useState, useEffect } from 'react';
-import { Building, Calendar, CreditCard, MapPin, Plus, Settings as SettingsIcon, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Building, Calendar, CreditCard, MapPin, Plus, Settings as SettingsIcon, Users, Save, X, Edit } from 'lucide-react';
 import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 import { supabase } from '../../lib/supabaseClient';
 import { signUp } from '../../utils/signUp';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import { Card, Button, Form, Input, Select, Checkbox, Table, Tag, Space, Modal, message, Spin, Alert, Tabs } from 'antd';
+import InputField from '../common-components/InputFields';
 
+const { TabPane } = Tabs;
+const { Option } = Select;
 
 const Settings = () => {
   const { hasPermission, isSuperAdmin } = useRoleBasedAccess();
-  const profile = useSelector((state) => state.user.userDetails)
+  const profile = useSelector((state) => state.user.userDetails);
+  const dispatch = useDispatch();
+  
+  // Redux state for NICU areas
+  const { areas: nicuAreas, loading: nicuAreasLoading, error: nicuAreasError } = useSelector((state) => state.nicuArea);
 
   const [activeTab, setActiveTab] = useState('organization');
   const [organizations, setOrganizations] = useState([]);
-  const [nicuAreas, setNicuAreas] = useState([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
 
-  // Form states
-  const [newOrganization, setNewOrganization] = useState({
-    name: '',
-    type: 'hospital',
-    adminName: '',
-    adminEmail: '',
-    adminDepartment: 'Administration'
-  });
-
-  const [newSubscription, setNewSubscription] = useState({
-    organizationId: '',
-    planId: '',
-    billingCycle: 'monthly',
-    paymentMethod: 'credit_card',
-    paymentReference: ''
-  });
-
-  const [newArea, setNewArea] = useState({
-    name: '',
-    description: ''
-  });
   const [editingArea, setEditingArea] = useState(null);
+  const dataFetchedRef = useRef(false);
 
-  const [newUser, setNewUser] = useState({
-    name: '',
-    email: '',
-    role: 'auditor',
-    department: ''
-  });
+  // Ant Design form instances
+  const [organizationForm] = Form.useForm();
+  const [areaForm] = Form.useForm();
+  const [userForm] = Form.useForm();
+  const [subscriptionForm] = Form.useForm();
 
   useEffect(() => {
-    if (hasPermission('canManageSettings')) {
+    if (profile?.organization_id && !nicuAreasLoading && nicuAreas.length === 0) {
+      dispatch(fetchNicuAreas(profile.organization_id));
+    }
+  }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (hasPermission?.('canManageSettings') && !dataFetchedRef.current) {
+      dataFetchedRef.current = true;
       fetchData();
     }
-    // eslint-disable-next-line
+
+    return () => {
+      dataFetchedRef.current = false;
+    };
   }, []);
 
+
   const fetchData = async () => {
+    if (loading) return; // Prevent concurrent calls
+    
     try {
       setLoading(true);
+      setError(null);
 
+      const promises = [];
+      
       if (isSuperAdmin) {
-        await fetchOrganizations();
+        promises.push(fetchOrganizations());
       }
-      await fetchNicuAreas();
-      await fetchSubscriptionPlans();
+      promises.push(fetchSubscriptionPlans());
+      
       if (!isSuperAdmin && profile?.organization_id) {
-        await fetchCurrentSubscription(profile.organization_id);
+        promises.push(fetchCurrentSubscription(profile.organization_id));
       }
+
+      await Promise.all(promises);
     } catch (err) {
       setError('Failed to load settings data');
       console.error('Error fetching data:', err);
@@ -77,114 +81,108 @@ const Settings = () => {
   };
 
   const fetchOrganizations = async () => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    setOrganizations(data || []);
-  };
-
-  const fetchNicuAreas = async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('nicu_areas_with_org')
-        .select('id, name')
-        .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
-        .order('name');
+        .from('organizations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      setNicuAreas(data || []);
+      setOrganizations(data || []);
     } catch (error) {
-      console.error('Error fetching NICU areas:', error);
-      setNicuAreas([]);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching organizations:', error);
+      setOrganizations([]);
     }
   };
 
   const fetchSubscriptionPlans = async () => {
-    const { data, error } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('is_active', true)
-      .order('price_monthly');
-    if (error) throw error;
-    setSubscriptionPlans(data || []);
-  };
-
-  const fetchCurrentSubscription = async (organizationId) => {
-    const { data, error } = await supabase
-      .rpc('get_organization_subscription', { org_id: organizationId });
-    if (error) throw error;
-    if (data && Object.keys(data).length > 0) {
-      setCurrentSubscription({
-        id: data.id || 'current',
-        organization_id: data.organization_id,
-        plan_id: data.plan_id || '',
-        status: data.subscription_status || 'trial',
-        start_date: data.start_date,
-        end_date: data.end_date,
-        trial_end_date: data.trial_end_date,
-        billing_cycle: data.billing_cycle || 'monthly',
-        amount_paid: data.amount_paid,
-        payment_method: data.payment_method,
-        payment_reference: data.payment_reference,
-        plan_name: data.plan_name
-      });
+    try {
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price_monthly');
+      
+      if (error) throw error;
+      setSubscriptionPlans(data || []);
+    } catch (error) {
+      console.error('Error fetching subscription plans:', error);
+      setSubscriptionPlans([]);
     }
   };
 
-  const createOrganization = async () => {
+  const fetchCurrentSubscription = async (organizationId) => {
+    if (!organizationId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_organization_subscription', { org_id: organizationId });
+      
+      if (error) throw error;
+      
+      if (data && Object.keys(data).length > 0) {
+        setCurrentSubscription({
+          id: data.id || 'current',
+          organization_id: data.organization_id,
+          plan_id: data.plan_id || '',
+          status: data.subscription_status || 'trial',
+          start_date: data.start_date,
+          end_date: data.end_date,
+          trial_end_date: data.trial_end_date,
+          billing_cycle: data.billing_cycle || 'monthly',
+          amount_paid: data.amount_paid,
+          payment_method: data.payment_method,
+          payment_reference: data.payment_reference,
+          plan_name: data.plan_name
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current subscription:', error);
+      setCurrentSubscription(null);
+    }
+  };
+
+  const createOrganization = async (values) => {
     try {
       setLoading(true);
       setError(null);
 
-      // 1. Create organization
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .insert({
-          name: newOrganization.name,
-          type: newOrganization.type,
+          name: values.name,
+          type: values.type,
           subscription_tier: 'starter'
         })
         .select()
         .single();
+      
       if (orgError) throw orgError;
 
-      // 2. Create admin user for the organization
       const { error: signUpError } = await signUp(
-        newOrganization.adminEmail,
-        'temp123!', // Temporary password - should be changed on first login
+        values.adminEmail,
+        'temp123!',
         {
-          name: newOrganization.adminName,
+          name: values.adminName,
           organization_id: orgData.id,
           role: 'admin',
-          department: newOrganization.adminDepartment
+          department: values.adminDepartment
         }
       );
+      
       if (signUpError) throw signUpError;
 
-      setSuccess(`Organization "${newOrganization.name}" and admin account created successfully!`);
-      setNewOrganization({
-        name: '',
-        type: 'hospital',
-        adminName: '',
-        adminEmail: '',
-        adminDepartment: 'Administration'
-      });
-
+      message.success(`Organization "${values.name}" and admin account created successfully!`);
+      organizationForm.resetFields();
       await fetchOrganizations();
     } catch (err) {
-      setError(err.message || 'Failed to create organization');
+      message.error(err?.message || 'Failed to create organization');
     } finally {
       setLoading(false);
     }
   };
 
-  const createSubscription = async () => {
+  const createSubscription = async (values) => {
     try {
       setLoading(true);
       setError(null);
@@ -192,35 +190,41 @@ const Settings = () => {
       const { data: plan, error: planError } = await supabase
         .from('subscription_plans')
         .select('*')
-        .eq('id', newSubscription.planId)
+        .eq('id', values.planId)
         .single();
 
       if (planError) throw planError;
 
       const { error } = await supabase
         .rpc('upgrade_subscription', {
-          org_id: newSubscription.organizationId,
+          org_id: values.organizationId,
           plan_name: plan.name,
-          billing_cycle: newSubscription.billingCycle,
-          payment_method: newSubscription.paymentMethod,
-          payment_reference: newSubscription.paymentReference
+          billing_cycle: values.billingCycle,
+          payment_method: values.paymentMethod,
+          payment_reference: values.paymentReference
         });
 
       if (error) throw error;
 
-      setSuccess(`Subscription created successfully for plan "${plan.name}"!`);
+      message.success(`Subscription created successfully for plan "${plan.name}"!`);
+      subscriptionForm.resetFields();
       await fetchOrganizations();
-      if (profile?.organization_id === newSubscription.organizationId) {
+      if (profile?.organization_id === values.organizationId) {
         await fetchCurrentSubscription(profile.organization_id);
       }
     } catch (err) {
-      setError(err.message || 'Failed to create subscription');
+      message.error(err?.message || 'Failed to create subscription');
     } finally {
       setLoading(false);
     }
   };
 
-  const createNICUArea = async () => {
+  const createNICUArea = async (values) => {
+    if (!profile?.organization_id) {
+      message.error('Organization ID not found');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -228,9 +232,9 @@ const Settings = () => {
       const { data, error } = await supabase
         .from('nicu_areas')
         .insert({
-          organization_id: profile?.organization_id,
-          name: newArea.name,
-          description: newArea.description,
+          organization_id: profile.organization_id,
+          name: values.name,
+          description: values.description,
           is_active: true
         })
         .select()
@@ -238,17 +242,23 @@ const Settings = () => {
 
       if (error) throw error;
 
-      setNicuAreas([...nicuAreas, data]);
-      setSuccess(`NICU Area "${newArea.name}" created successfully!`);
-      setNewArea({ name: '', description: '' });
+      message.success(`NICU Area "${values.name}" created successfully!`);
+      areaForm.resetFields();
+      // Refresh NICU areas from Redux
+      dispatch(fetchNicuAreas(profile.organization_id));
     } catch (err) {
-      setError(err.message || 'Failed to create NICU area');
+      message.error(err?.message || 'Failed to create NICU area');
     } finally {
       setLoading(false);
     }
   };
 
   const updateNICUArea = async (area) => {
+    if (!area?.id) {
+      message.error('Invalid area data');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -264,775 +274,564 @@ const Settings = () => {
 
       if (error) throw error;
 
-      setNicuAreas(nicuAreas.map(a => a.id === area.id ? area : a));
-      setSuccess(`NICU Area "${area.name}" updated successfully!`);
+      message.success(`NICU Area "${area.name}" updated successfully!`);
       setEditingArea(null);
+      // Refresh NICU areas from Redux
+      dispatch(fetchNicuAreas(profile.organization_id));
     } catch (err) {
-      setError(err.message || 'Failed to update NICU area');
+      message.error(err?.message || 'Failed to update NICU area');
     } finally {
       setLoading(false);
     }
   };
 
-  const createUser = async () => {
+  const createUser = async (values) => {
+    if (!profile?.organization_id) {
+      message.error('Organization ID not found');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
       const { error } = await signUp(
-        newUser.email,
+        values.email,
         'temp123!',
         {
-          name: newUser.name,
-          organization_id: profile?.organization_id,
-          role: newUser.role,
-          department: newUser.department
+          name: values.name,
+          organization_id: profile.organization_id,
+          role: values.role,
+          department: values.department
         }
       );
 
       if (error) throw error;
 
-      setSuccess(`User "${newUser.name}" created successfully!`);
-      setNewUser({ name: '', email: '', role: 'auditor', department: '' });
+      message.success(`User "${values.name}" created successfully!`);
+      userForm.resetFields();
     } catch (err) {
-      setError(err.message || 'Failed to create user');
+      message.error(err?.message || 'Failed to create user');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!hasPermission('canManageSettings')) {
+  // Organization table columns
+  const organizationColumns = [
+    {
+      title: 'Organization',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text) => <span className="font-medium">{text}</span>,
+    },
+    {
+      title: 'Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type) => (
+        <Tag color="blue">{type?.replace('_', ' ') || 'N/A'}</Tag>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'subscription_status',
+      key: 'subscription_status',
+      render: (status) => {
+        const color = status === 'active' ? 'green' : status === 'trial' ? 'blue' : 'red';
+        return <Tag color={color}>{status || 'N/A'}</Tag>;
+      },
+    },
+    {
+      title: 'Subscription',
+      dataIndex: 'subscription_tier',
+      key: 'subscription_tier',
+      render: (tier) => <Tag color="green">{tier || 'N/A'}</Tag>,
+    },
+    {
+      title: 'Created',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
+    },
+  ];
+
+  if (!hasPermission?.('canManageSettings')) {
     return (
       <div className="text-center py-12">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 max-w-md mx-auto">
-          <SettingsIcon className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-yellow-900 mb-2">Access Restricted</h2>
-          <p className="text-yellow-700">
-            You don't have permission to access settings. Please contact your administrator.
-          </p>
-        </div>
+        <Card className="max-w-md mx-auto">
+          <div className="text-center">
+            <SettingsIcon className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-yellow-900 mb-2">Access Restricted</h2>
+            <p className="text-yellow-700">
+              You don't have permission to access settings. Please contact your administrator.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && !organizations.length && !nicuAreas.length) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spin size="large" />
       </div>
     );
   }
 
   return (
-  <div className="space-y-6">
-    {/* Header */}
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-      <p className="text-gray-600 mt-1">
-        Manage {isSuperAdmin ? 'organizations, users, and system' : 'organization'} settings
-      </p>
-    </div>
-
-    {/* Success/Error Messages */}
-    {success && (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <p className="text-green-800">{success}</p>
-        <button
-          onClick={() => setSuccess(null)}
-          className="mt-2 text-green-600 hover:text-green-800"
-        >
-          Dismiss
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+        <p className="text-gray-600 mt-1">
+          Manage {isSuperAdmin ? 'organizations, users, and system' : 'organization'} settings
+        </p>
       </div>
-    )}
-    {error && (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">{error}</p>
-        <button
-          onClick={() => setError(null)}
-          className="mt-2 text-red-600 hover:text-red-800"
-        >
-          Dismiss
-        </button>
-      </div>
-    )}
 
-    {/* Tabs */}
-    <div className="border-b border-gray-200">
-      <nav className="-mb-px flex space-x-8">
-        {isSuperAdmin && (
-          <button
-            onClick={() => setActiveTab('organization')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'organization' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-          >
-            <Building className="h-4 w-4 inline mr-2" />
-            Organizations
-          </button>
-        )}
-        <button
-          onClick={() => setActiveTab('areas')}
-          className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'areas' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <MapPin className="h-4 w-4 inline mr-2" />
-          NICU Areas
-        </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'users' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <Users className="h-4 w-4 inline mr-2" />
-          Users
-        </button>
-        <button
-          onClick={() => setActiveTab('subscription')}
-          className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'subscription' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <CreditCard className="h-4 w-4 inline mr-2" />
-          Subscription
-        </button>
-      </nav>
-    </div>
-
-    {/* Organization Management (Super Admin Only) */}
-    {isSuperAdmin && activeTab === 'organization' && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Organization</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Organization Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newOrganization.name}
-                  onChange={(e) => setNewOrganization(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter organization name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Organization Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newOrganization.type}
-                  onChange={(e) => setNewOrganization(prev => ({ ...prev, type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="hospital">Hospital</option>
-                  <option value="health_system">Health System</option>
-                  <option value="clinic">Clinic</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newOrganization.adminName}
-                  onChange={(e) => setNewOrganization(prev => ({ ...prev, adminName: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter admin full name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={newOrganization.adminEmail}
-                  onChange={(e) => setNewOrganization(prev => ({ ...prev, adminEmail: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter admin email"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Department
-                </label>
-                <input
-                  type="text"
-                  value={newOrganization.adminDepartment}
-                  onChange={(e) => setNewOrganization(prev => ({ ...prev, adminDepartment: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter department"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <button
-                onClick={createOrganization}
-                disabled={loading || !newOrganization.name || !newOrganization.adminName || !newOrganization.adminEmail}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>{loading ? 'Creating...' : 'Create Organization & Admin'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Organizations List */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Existing Organizations</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Organization
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Subscription
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {organizations.map((org) => (
-                    <tr key={org.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{org.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {org?.type?.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          org.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
-                          org.subscription_status === 'trial' ? 'bg-blue-100 text-blue-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {org.subscription_status}
-                        </span>
-                        {org.trial_ends_at && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Trial ends: {new Date(org?.trial_ends_at)?.toLocaleDateString()}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                          {org.subscription_tier}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(org?.created_at)?.toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+      {/* Error Messages */}
+      {nicuAreasError && (
+        <Alert
+          message="Error"
+          description={nicuAreasError}
+          type="error"
+          showIcon
+          closable
+        />
       )}
 
-    {/* Subscription Management */}
-    {activeTab === 'subscription' && (
-        <div className="space-y-6">
-          {/* Current Subscription */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              {isSuperAdmin ? 'Create New Subscription' : 'Current Subscription'}
-            </h3>
-            
-            {isSuperAdmin ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Organization <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={newSubscription.organizationId}
-                      onChange={(e) => setNewSubscription(prev => ({ ...prev, organizationId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Organization</option>
-                      {organizations.map(org => (
-                        <option key={org.id} value={org.id}>{org.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Subscription Plan <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={newSubscription.planId}
-                      onChange={(e) => setNewSubscription(prev => ({ ...prev, planId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Plan</option>
-                      {subscriptionPlans.map(plan => (
-                        <option key={plan.id} value={plan.id}>{plan.name} - ${plan.price_monthly}/month</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Billing Cycle <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={newSubscription.billingCycle}
-                      onChange={(e) => setNewSubscription(prev => ({ ...prev, billingCycle: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly (10% discount)</option>
-                      <option value="half_yearly">Half-Yearly (15% discount)</option>
-                      <option value="yearly">Yearly (20% discount)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Method
-                    </label>
-                    <select
-                      value={newSubscription.paymentMethod}
-                      onChange={(e) => setNewSubscription(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="credit_card">Credit Card</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="paypal">PayPal</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payment Reference
-                    </label>
-                    <input
-                      type="text"
-                      value={newSubscription.paymentReference}
-                      onChange={(e) => setNewSubscription(prev => ({ ...prev, paymentReference: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Invoice or transaction reference"
+      {/* Tabs */}
+      <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        {/* Organization Management (Super Admin Only) */}
+        {isSuperAdmin && (
+          <TabPane tab={<span><Building className="h-4 w-4 inline mr-2" />Organizations</span>} key="organization">
+            <div className="space-y-6">
+              <Card title="Create New Organization" className="mb-6">
+                <Form
+                  form={organizationForm}
+                  layout="vertical"
+                  onFinish={createOrganization}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputField
+                      label="Organization Name"
+                      name="name"
+                      required
+                      placeholder="Enter organization name"
+                    />
+                    <InputField
+                      label="Organization Type"
+                      name="type"
+                      type="select"
+                      required
+                      options={[
+                        { value: 'hospital', label: 'Hospital' },
+                        { value: 'health_system', label: 'Health System' },
+                        { value: 'clinic', label: 'Clinic' },
+                      ]}
+                    />
+                    <InputField
+                      label="Admin Name"
+                      name="adminName"
+                      required
+                      placeholder="Enter admin full name"
+                    />
+                    <InputField
+                      label="Admin Email"
+                      name="adminEmail"
+                      type="email"
+                      required
+                      placeholder="Enter admin email"
+                    />
+                    <InputField
+                      label="Admin Department"
+                      name="adminDepartment"
+                      placeholder="Enter department"
                     />
                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <button
-                    onClick={createSubscription}
-                    disabled={loading || !newSubscription.organizationId || !newSubscription.planId}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>{loading ? 'Creating...' : 'Create Subscription'}</span>
-                  </button>
-                </div>
-              </div>
-            ) : currentSubscription ? (
-              <div className="space-y-6">
-                <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-3 rounded-full ${
-                        currentSubscription.status === 'active' ? 'bg-green-100 text-green-700' :
-                        currentSubscription.status === 'trial' ? 'bg-blue-100 text-blue-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        <CreditCard className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900">{currentSubscription.plan_name} Plan</h4>
-                        <p className="text-sm text-gray-600 capitalize">
-                          {currentSubscription.status} • {currentSubscription.billing_cycle} billing
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-600">Subscription ID</div>
-                      <div className="font-mono text-xs text-gray-500">{currentSubscription.id}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="bg-white p-3 rounded-md border border-blue-100">
-                      <div className="text-sm text-gray-600">Start Date</div>
-                      <div className="font-medium text-gray-900">
-                        {new Date(currentSubscription.start_date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="bg-white p-3 rounded-md border border-blue-100">
-                      <div className="text-sm text-gray-600">End Date</div>
-                      <div className="font-medium text-gray-900">
-                        {new Date(currentSubscription.end_date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="bg-white p-3 rounded-md border border-blue-100">
-                      <div className="text-sm text-gray-600">Amount Paid</div>
-                      <div className="font-medium text-gray-900">
-                        ${currentSubscription.amount_paid?.toFixed(2) || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {currentSubscription.status === 'trial' && currentSubscription.trial_end_date && (
-                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 mb-4">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-yellow-600" />
-                        <div className="text-sm font-medium text-yellow-800">
-                          Trial ends on {new Date(currentSubscription.trial_end_date).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div className="text-xs text-yellow-700 mt-1">
-                        Please upgrade to a paid plan before your trial expires to avoid service interruption.
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-end">
-                    <button
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  <div className="mt-6">
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
+                      icon={<Plus className="h-4 w-4" />}
                     >
-                      Manage Subscription
-                    </button>
+                      Create Organization & Admin
+                    </Button>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No active subscription found.</p>
-                <p className="text-sm mt-1">Contact the super admin to set up your subscription.</p>
-              </div>
-            )}
-          </div>
+                </Form>
+              </Card>
 
-          {/* Subscription Plans */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Available Subscription Plans</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {subscriptionPlans.map((plan) => (
-                <div key={plan.id} className={`border rounded-lg overflow-hidden ${
-                  currentSubscription?.plan_id === plan.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
-                }`}>
-                  <div className="bg-gray-50 p-4 border-b border-gray-200">
-                    <h4 className="text-lg font-semibold text-gray-900">{plan.name}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{plan.description}</p>
-                  </div>
-                  <div className="p-4">
-                    <div className="mb-4">
-                      <div className="text-3xl font-bold text-gray-900">${plan.price_monthly}</div>
-                      <div className="text-sm text-gray-600">per month</div>
-                    </div>
-                    <div className="space-y-2 text-sm text-gray-600 mb-4">
-                      <div>Quarterly: ${plan.price_quarterly} (Save 10%)</div>
-                      <div>Half-Yearly: ${plan.price_half_yearly} (Save 15%)</div>
-                      <div>Yearly: ${plan.price_yearly} (Save 20%)</div>
-                    </div>
-                    <div className="border-t border-gray-200 pt-4 space-y-2">
-                      <div className="text-sm font-medium text-gray-900">Features:</div>
-                      <ul className="space-y-1 text-sm text-gray-600">
-                        <li>• Users: {plan.features.max_users}</li>
-                        <li>• Audits/month: {plan.features.max_audits_per_month}</li>
-                        <li>• NICU Areas: {plan.features.max_areas}</li>
-                        <li>• Audit Types: {plan.features.audit_types.length}</li>
-                        <li>• Export Formats: {plan.features.export_formats.join(', ')}</li>
-                        <li>• Support: {plan.features.support_level.replace('_', ' ')}</li>
-                        {plan.features.white_label && <li>• White Label: Yes</li>}
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 p-4 border-t border-gray-200">
-                    {currentSubscription?.plan_id === plan.id ? (
-                      <div className="text-center text-sm font-medium text-blue-600">Current Plan</div>
-                    ) : (
-                      <button
-                        className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        onClick={() => {
-                          if (isSuperAdmin) {
-                            setNewSubscription(prev => ({ ...prev, planId: plan.id }));
-                            setActiveTab('subscription');
-                          }
-                        }}
-                      >
-                        {isSuperAdmin ? 'Select Plan' : 'Contact Admin to Upgrade'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Subscription FAQ */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Subscription FAQ</h3>
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-900">What happens when my trial ends?</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  When your trial period ends, you'll need to upgrade to a paid plan to continue using the platform. 
-                  Your data will be preserved for 30 days after trial expiration.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">How do I upgrade my subscription?</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  Contact our sales team or your super admin to upgrade your subscription to a different plan.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">Can I change my billing cycle?</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  Yes, you can change your billing cycle at the end of your current billing period. 
-                  Longer billing cycles offer greater discounts.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-    {/* NICU Areas Management */}
-    {activeTab === 'areas' && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New NICU Area</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Area Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newArea.name}
-                  onChange={(e) => setNewArea(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., NICU Bay C"
+              <Card title="Existing Organizations">
+                <Table
+                  dataSource={organizations}
+                  columns={organizationColumns}
+                  rowKey="id"
+                  pagination={false}
+                  loading={loading}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={newArea.description}
-                  onChange={(e) => setNewArea(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Brief description of the area"
-                />
-              </div>
+              </Card>
             </div>
+          </TabPane>
+        )}
 
-            <div className="mt-6">
-              <button
-                onClick={createNICUArea}
-                disabled={loading || !newArea.name}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        {/* NICU Areas Management */}
+        <TabPane tab={<span><MapPin className="h-4 w-4 inline mr-2" />NICU Areas</span>} key="areas">
+          <div className="space-y-6">
+            <Card title="Add New NICU Area" className="mb-6">
+              <Form
+                form={areaForm}
+                layout="vertical"
+                onFinish={createNICUArea}
               >
-                <Plus className="h-4 w-4" />
-                <span>{loading ? 'Creating...' : 'Add NICU Area'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* NICU Areas List */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">NICU Areas</h3>
-            <div className="space-y-4">
-              {nicuAreas.map((area) => (
-                <div key={area.id} className="border border-gray-200 rounded-lg p-4">
-                  {editingArea?.id === area.id ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Area Name
-                          </label>
-                          <input
-                            type="text"
-                            value={editingArea.name}
-                            onChange={(e) => setEditingArea({ ...editingArea, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={editingArea.description}
-                            onChange={(e) => setEditingArea({ ...editingArea, description: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={editingArea.is_active}
-                          onChange={(e) => setEditingArea({ ...editingArea, is_active: e.target.checked })}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label className="text-sm text-gray-700">Active</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateNICUArea(editingArea)}
-                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                        >
-                          <Save className="h-3 w-3" />
-                          <span>Save</span>
-                        </button>
-                        <button
-                          onClick={() => setEditingArea(null)}
-                          className="flex items-center space-x-1 px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
-                        >
-                          <X className="h-3 w-3" />
-                          <span>Cancel</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-gray-900">{area.name}</h4>
-                        <p className="text-sm text-gray-600">{area.description}</p>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
-                          area.is_active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {area.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setEditingArea(area)}
-                        className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                      >
-                        <Edit className="h-3 w-3" />
-                        <span>Edit</span>
-                      </button>
-                    </div>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputField
+                    label="Area Name"
+                    name="name"
+                    required
+                    placeholder="e.g., NICU Bay C"
+                  />
+                  <InputField
+                    label="Description"
+                    name="description"
+                    placeholder="Brief description of the area"
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+                <div className="mt-6">
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    icon={<Plus className="h-4 w-4" />}
+                  >
+                    Add NICU Area
+                  </Button>
+                </div>
+              </Form>
+            </Card>
 
-    {/* User Management */}
-    {activeTab === 'users' && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New User</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <Card title="NICU Areas">
+              <div className="space-y-4">
+                {nicuAreasLoading ? (
+                  <div className="text-center py-8">
+                    <Spin />
+                  </div>
+                ) : (
+                  nicuAreas?.map((area) => (
+                    <Card key={area?.id} size="small" className="mb-4">
+                      {editingArea?.id === area?.id ? (
+                        <Form
+                          initialValues={editingArea}
+                          onFinish={(values) => updateNICUArea({ ...editingArea, ...values })}
+                          layout="vertical"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <InputField
+                              label="Area Name"
+                              name="name"
+                              required
+                            />
+                            <InputField
+                              label="Description"
+                              name="description"
+                            />
+                          </div>
+                          <Form.Item name="is_active" valuePropName="checked">
+                            <Checkbox>Active</Checkbox>
+                          </Form.Item>
+                          <Space>
+                            <Button type="primary" htmlType="submit" loading={loading} icon={<Save className="h-3 w-3" />}>
+                              Save
+                            </Button>
+                            <Button onClick={() => setEditingArea(null)} icon={<X className="h-3 w-3" />}>
+                              Cancel
+                            </Button>
+                          </Space>
+                        </Form>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{area?.name}</h4>
+                            <p className="text-sm text-gray-600">{area?.description}</p>
+                            <Tag color={area?.is_active ? 'green' : 'red'} className="mt-1">
+                              {area?.is_active ? 'Active' : 'Inactive'}
+                            </Tag>
+                          </div>
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => setEditingArea(area)}
+                            icon={<Edit className="h-3 w-3" />}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+        </TabPane>
+
+        {/* User Management */}
+        <TabPane tab={<span><Users className="h-4 w-4 inline mr-2" />Users</span>} key="users">
+          <Card title="Add New User" className="mb-6">
+            <Form
+              form={userForm}
+              layout="vertical"
+              onFinish={createUser}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField
+                  label="Full Name"
+                  name="name"
+                  required
                   placeholder="Enter full name"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
+                <InputField
+                  label="Email"
+                  name="email"
                   type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
                   placeholder="Enter email address"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Role <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="auditor">Auditor</option>
-                  <option value="viewer">Viewer</option>
-                  {isSuperAdmin && <option value="admin">Admin</option>}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Department
-                </label>
-                <input
-                  type="text"
-                  value={newUser.department}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, department: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <InputField
+                  label="Role"
+                  name="role"
+                  type="select"
+                  required
+                  options={[
+                    { value: 'auditor', label: 'Auditor' },
+                    { value: 'viewer', label: 'Viewer' },
+                    ...(isSuperAdmin ? [{ value: 'admin', label: 'Admin' }] : []),
+                  ]}
+                />
+                <InputField
+                  label="Department"
+                  name="department"
                   placeholder="e.g., NICU, Infection Control"
                 />
               </div>
-            </div>
-
-            <div className="mt-6">
-              <button
-                onClick={createUser}
-                disabled={loading || !newUser.name || !newUser.email}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>{loading ? 'Creating...' : 'Create User'}</span>
-              </button>
-            </div>
-
-            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> New users will receive a temporary password "temp123!" and should change it on first login.
-              </p>
-            </div>
-            
-            {/* User Limits Warning */}
-            {currentSubscription && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
-                  <p className="text-sm font-medium text-blue-800">
-                    Subscription Plan: {currentSubscription.plan_name}
-                  </p>
-                </div>
-                <p className="text-sm text-blue-700 mt-1">
-                  Your current plan allows for a maximum of {
-                    currentSubscription.plan_name === 'string' && 
-                    subscriptionPlans.find(p => p.name === currentSubscription.plan_name)?.features?.max_users || 'unlimited'
-                  } users.
-                </p>
+              <div className="mt-6">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  icon={<Plus className="h-4 w-4" />}
+                >
+                  Create User
+                </Button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-  </div>
-);
+            </Form>
 
+            <Alert
+              message="Note"
+              description="New users will receive a temporary password 'temp123!' and should change it on first login."
+              type="warning"
+              showIcon
+              className="mt-4"
+            />
+          </Card>
+        </TabPane>
+
+        {/* Subscription Management */}
+        <TabPane tab={<span><CreditCard className="h-4 w-4 inline mr-2" />Subscription</span>} key="subscription">
+          <div className="space-y-6">
+            <Card title={isSuperAdmin ? 'Create New Subscription' : 'Current Subscription'}>
+              {isSuperAdmin ? (
+                <Form
+                  form={subscriptionForm}
+                  layout="vertical"
+                  onFinish={createSubscription}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputField
+                      label="Organization"
+                      name="organizationId"
+                      type="select"
+                      required
+                      placeholder="Select Organization"
+                      options={organizations?.map(org => ({ value: org?.id, label: org?.name }))}
+                    />
+                    <InputField
+                      label="Subscription Plan"
+                      name="planId"
+                      type="select"
+                      required
+                      placeholder="Select Plan"
+                      options={subscriptionPlans?.map(plan => ({ 
+                        value: plan?.id, 
+                        label: `${plan?.name} - $${plan?.price_monthly}/month` 
+                      }))}
+                    />
+                    <InputField
+                      label="Billing Cycle"
+                      name="billingCycle"
+                      type="select"
+                      required
+                      options={[
+                        { value: 'monthly', label: 'Monthly' },
+                        { value: 'quarterly', label: 'Quarterly (10% discount)' },
+                        { value: 'half_yearly', label: 'Half-Yearly (15% discount)' },
+                        { value: 'yearly', label: 'Yearly (20% discount)' },
+                      ]}
+                    />
+                    <InputField
+                      label="Payment Method"
+                      name="paymentMethod"
+                      type="select"
+                      options={[
+                        { value: 'credit_card', label: 'Credit Card' },
+                        { value: 'bank_transfer', label: 'Bank Transfer' },
+                        { value: 'paypal', label: 'PayPal' },
+                      ]}
+                    />
+                    <InputField
+                      label="Payment Reference"
+                      name="paymentReference"
+                      placeholder="Invoice or transaction reference"
+                    />
+                  </div>
+                  <div className="mt-6">
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
+                      icon={<Plus className="h-4 w-4" />}
+                    >
+                      Create Subscription
+                    </Button>
+                  </div>
+                </Form>
+              ) : currentSubscription ? (
+                <div className="space-y-6">
+                  <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-3 rounded-full ${
+                          currentSubscription?.status === 'active' ? 'bg-green-100 text-green-700' :
+                          currentSubscription?.status === 'trial' ? 'bg-blue-100 text-blue-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          <CreditCard className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900">{currentSubscription?.plan_name} Plan</h4>
+                          <p className="text-sm text-gray-600 capitalize">
+                            {currentSubscription?.status} • {currentSubscription?.billing_cycle} billing
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Subscription ID</div>
+                        <div className="font-mono text-xs text-gray-500">{currentSubscription?.id}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="bg-white p-3 rounded-md border border-blue-100">
+                        <div className="text-sm text-gray-600">Start Date</div>
+                        <div className="font-medium text-gray-900">
+                          {currentSubscription?.start_date ? new Date(currentSubscription.start_date).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </div>
+                      <div className="bg-white p-3 rounded-md border border-blue-100">
+                        <div className="text-sm text-gray-600">End Date</div>
+                        <div className="font-medium text-gray-900">
+                          {currentSubscription?.end_date ? new Date(currentSubscription.end_date).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </div>
+                      <div className="bg-white p-3 rounded-md border border-blue-100">
+                        <div className="text-sm text-gray-600">Amount Paid</div>
+                        <div className="font-medium text-gray-900">
+                          ${currentSubscription?.amount_paid?.toFixed(2) || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {currentSubscription?.status === 'trial' && currentSubscription?.trial_end_date && (
+                      <Alert
+                        message="Trial Period"
+                        description={`Trial ends on ${new Date(currentSubscription.trial_end_date).toLocaleDateString()}. Please upgrade to a paid plan before your trial expires to avoid service interruption.`}
+                        type="warning"
+                        showIcon
+                        className="mb-4"
+                      />
+                    )}
+                    
+                    <div className="flex justify-end">
+                      <Button type="primary">
+                        Manage Subscription
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No active subscription found.</p>
+                  <p className="text-sm mt-1">Contact the super admin to set up your subscription.</p>
+                </div>
+              )}
+            </Card>
+
+            {/* Subscription Plans */}
+            <Card title="Available Subscription Plans">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {subscriptionPlans?.map((plan) => (
+                  <Card key={plan?.id} className={`${
+                    currentSubscription?.plan_id === plan?.id ? 'border-blue-500 ring-2 ring-blue-200' : ''
+                  }`}>
+                    <div className="text-center">
+                      <h4 className="text-lg font-semibold text-gray-900">{plan?.name}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{plan?.description}</p>
+                      <div className="mt-4">
+                        <div className="text-3xl font-bold text-gray-900">${plan?.price_monthly}</div>
+                        <div className="text-sm text-gray-600">per month</div>
+                      </div>
+                      <div className="mt-4 space-y-2 text-sm text-gray-600">
+                        <div>Quarterly: ${plan?.price_yearly ? (plan.price_yearly / 4).toFixed(2) : 'N/A'} (Save 10%)</div>
+                        <div>Half-Yearly: ${plan?.price_yearly ? (plan.price_yearly / 2).toFixed(2) : 'N/A'} (Save 15%)</div>
+                        <div>Yearly: ${plan?.price_yearly} (Save 20%)</div>
+                      </div>
+                      <div className="mt-4 border-t border-gray-200 pt-4">
+                        <div className="text-sm font-medium text-gray-900 mb-2">Features:</div>
+                        <ul className="space-y-1 text-sm text-gray-600 text-left">
+                          <li>• Users: {plan?.max_users || 'Unlimited'}</li>
+                          <li>• Audits/month: {plan?.max_audits_per_month || 'Unlimited'}</li>
+                          <li>• Organizations: {plan?.max_organizations || 'Unlimited'}</li>
+                          <li>• Support: {plan?.features?.support_level?.replace('_', ' ') || 'Email'}</li>
+                        </ul>
+                      </div>
+                      <div className="mt-4">
+                        {currentSubscription?.plan_id === plan?.id ? (
+                          <Tag color="blue">Current Plan</Tag>
+                        ) : (
+                          <Button
+                            type="primary"
+                            onClick={() => {
+                              if (isSuperAdmin) {
+                                subscriptionForm.setFieldsValue({ planId: plan?.id });
+                                setActiveTab('subscription');
+                              }
+                            }}
+                          >
+                            {isSuperAdmin ? 'Select Plan' : 'Contact Admin to Upgrade'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </TabPane>
+      </Tabs>
+    </div>
+  );
 };
 
 export default Settings;

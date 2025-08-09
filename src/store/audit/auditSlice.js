@@ -5,7 +5,20 @@ const initialState = {
   audits: [],
   metrics: [],
   loading: false,
-  error: null
+  error: null,
+  // Dashboard data
+  dashboardData: {
+    handHygiene: [],
+    handWash: [],
+    vap: { data: [], months: [] },
+    niv: [],
+    clabsi: [],
+    disinfection: [],
+    loading: false,
+    error: null
+  },
+  // Track if data has been initialized
+  initialized: false
 }
 
 const auditSlice = createSlice({
@@ -35,6 +48,20 @@ const auditSlice = createSlice({
     },
     setError: (state, action) => {
       state.error = action.payload
+    },
+    // Dashboard data actions
+    setDashboardData: (state, action) => {
+      const { type, data } = action.payload
+      state.dashboardData[type] = data
+    },
+    setDashboardLoading: (state, action) => {
+      state.dashboardData.loading = action.payload
+    },
+    setDashboardError: (state, action) => {
+      state.dashboardData.error = action.payload
+    },
+    setInitialized: (state, action) => {
+      state.initialized = action.payload
     }
   }
 })
@@ -46,7 +73,11 @@ export const {
   deleteAudit,
   setMetrics,
   setLoading,
-  setError
+  setError,
+  setDashboardData,
+  setDashboardLoading,
+  setDashboardError,
+  setInitialized
 } = auditSlice.actions
 
 export default auditSlice.reducer
