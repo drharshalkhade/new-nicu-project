@@ -4,8 +4,6 @@ import {
   Save,
   AlertCircle,
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import {
   Form,
@@ -21,36 +19,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { calculateDisinfectionCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-import ComplianceDisplay from '../common-components/ComplianceDisplay';
 
 const { Option } = Select;
-
-const taskDefinitions = {
-  daily: [
-    { key: 'transportIncubator', label: 'Was Transport Incubator disinfected using Bacilloid?' },
-    { key: 'laminarFlow', label: 'Was Laminar Flow disinfected with Bacillocid twice today?' },
-    { key: 'neopuff', label: 'Was Neopuff disinfected with Bacillocid?' },
-    { key: 'suctionJars', label: 'Were Suction Jars and Tubings cleaned and dated?' },
-    { key: 'intubationTray', label: 'Was Intubation Tray disinfected with Bacillocid?' },
-    { key: 'bottleSteriliser', label: 'Was Bottle Steriliser cleaned with soap?' },
-    { key: 'chitelForceps', label: 'Were Chitel Forceps disinfected appropriately?' },
-    { key: 'bedsideTrays', label: 'Were Bedside Trays disinfected?' },
-    { key: 'milkPrepTrays', label: 'Were Milk Preparation Trays washed with hot water?' },
-    { key: 'weighingMachine', label: 'Was Weighing Machine disinfected?' },
-  ],
-  afterUse: [
-    { key: 'laryngoscope', label: 'Was Laryngoscope disinfected after use?' },
-    { key: 'ventilatorCircuit', label: 'Was Ventilator Circuit disinfected and replaced after use?' },
-    { key: 'ambuBag', label: 'Was Ambu Bag dismantled, cleaned, and disinfected after use?' },
-    { key: 'oxygenJars', label: 'Were Oxygen Jars replaced and disinfected after use?' },
-  ],
-  weekly: [
-    { key: 'fridge', label: 'Was Fridge disinfected on scheduled days?' },
-    { key: 'cpapVentilators', label: 'Were CPAP Ventilators disinfected on scheduled days?' },
-    { key: 'warmers', label: 'Were Warmers disinfected on scheduled days?' },
-    { key: 'incubators', label: 'Were Incubators disinfected on scheduled days?' },
-  ],
-};
 
 const DisinfectionForm = () => {
   const navigate = useNavigate();
@@ -61,11 +31,7 @@ const DisinfectionForm = () => {
   const nicuAreas = useSelector(state => state.nicuArea.areas);
   const loadingAreas = useSelector(state => state.nicuArea.loading);
 
-  const [expandedSections, setExpandedSections] = useState({
-    daily: false,
-    afterUse: false,
-    weekly: false,
-  });
+  const [selectedTaskType, setSelectedTaskType] = useState('');
   const [submitStatus, setSubmitStatus] = useState('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form] = Form.useForm();
@@ -76,17 +42,8 @@ const DisinfectionForm = () => {
     }
   }, [profile?.organization_id]);
 
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
   const onTaskTypeChange = (value) => {
-    form.setFieldsValue({ taskType: value });
-    setExpandedSections({
-      daily: value === 'daily',
-      afterUse: value === 'afterUse',
-      weekly: value === 'weekly',
-    });
+    setSelectedTaskType(value);
   };
 
   const computeCompliance = (values) => {
@@ -109,11 +66,11 @@ const DisinfectionForm = () => {
         time: new Date().toTimeString().slice(0, 5),
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
-        nicuArea: values.hospitalName || 'Unknown',
+        nicuArea: values.nicuArea || 'Unknown',
         nicuAreaId: values.nicuAreaId,
         taskType: values.taskType,
         taskValues: Object.fromEntries(
-          Object.entries(values).filter(([key]) => key !== 'hospitalName' && key !== 'nicuAreaId' && key !== 'taskType')
+          Object.entries(values).filter(([key]) => key !== 'nicuArea' && key !== 'nicuAreaId' && key !== 'taskType' && key !== 'email' && key !== 'staffName')
         ),
         complianceScore: complianceObj.score,
         complianceLevel: complianceObj,
@@ -143,7 +100,7 @@ const DisinfectionForm = () => {
           onFinish={onFinish}
           layout="vertical"
           scrollToFirstError
-          initialValues={{ taskType: '', nicuArea: '', taskValues: {} }}
+          initialValues={{ taskType: '', nicuArea: '', email: user?.email }}
         >
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-600 to-orange-700 flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -173,146 +130,313 @@ const DisinfectionForm = () => {
 
           <div className="p-6 space-y-6">
             {/* Basic Info */}
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Form.Item 
-                  label="Email *" 
-                  name="email" 
-                  initialValue={user?.email}
-                  rules={[{ required: true, message: 'Email is required' }]}
-                >
-                  <Input disabled />
-                </Form.Item>
-                <Form.Item 
-                  label="Name of Staff / Supervisor *" 
-                  name="staffName"
-                  rules={[{ required: true, message: 'Please enter staff/supervisor name' }]}
-                >
-                  <Input placeholder="Enter staff/supervisor name" />
-                </Form.Item>
-                <Form.Item
-                  label="Hospital Name *"
-                  name="hospitalName"
-                  rules={[{ required: true, message: 'Please select a NICU area' }]}
-                >
-                  {loadingAreas ? (
-                    <Spin />
-                  ) : (
-                    <Select 
-                      placeholder="Select NICU area" 
-                      allowClear
-                      onChange={(value, option) => {
-                        const selectedArea = nicuAreas.find(area => area.name === value);
-                        if (selectedArea) {
-                          form.setFieldsValue({ nicuAreaId: selectedArea.id });
-                        }
-                      }}
-                    >
-                      {nicuAreas.map((area) => (
-                        <Option key={area.id} value={area.name}>
-                          {area.name}
-                        </Option>
-                      ))}
-                    </Select>
-                  )}
-                </Form.Item>
-                <Form.Item
-                  label="NICU Area Id"
-                  name="nicuAreaId"
-                  rules={[{ required: true, message: 'NICU Area ID is required' }]}
-                  hidden
-                >
-                  <Input disabled />
-                </Form.Item>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Form.Item 
+                label="Email *" 
+                name="email" 
+                rules={[{ required: true, message: 'Email is required' }]}
+              >
+                <Input disabled />
+              </Form.Item>
+              <Form.Item 
+                label="Name of Staff / Supervisor *" 
+                name="staffName"
+                rules={[{ required: true, message: 'Please enter staff/supervisor name' }]}
+              >
+                <Input placeholder="Enter staff/supervisor name" />
+              </Form.Item>
+              <Form.Item
+                label="NICU Area *"
+                name="nicuArea"
+                rules={[{ required: true, message: 'Please select a NICU area' }]}
+              >
+                {loadingAreas ? (
+                  <Spin />
+                ) : (
+                  <Select 
+                    placeholder="Select NICU area" 
+                    allowClear
+                    onChange={(value, option) => {
+                      const selectedArea = nicuAreas.find(area => area.name === value);
+                      if (selectedArea) {
+                        form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                      }
+                    }}
+                  >
+                    {nicuAreas.map((area) => (
+                      <Option key={area.id} value={area.name}>
+                        {area.name}
+                      </Option>
+                    ))}
+                  </Select>
+                )}
+              </Form.Item>
+              <Form.Item
+                label="NICU Area Id"
+                name="nicuAreaId"
+                rules={[{ required: true, message: 'NICU Area ID is required' }]}
+                hidden
+              >
+                <Input disabled />
+              </Form.Item>
             </div>
 
-            {/* Task Type */}
-            <Form.Item
-              label="Select Task Type *"
-              name="taskType"
-              rules={[{ required: true, message: 'Please select a task type' }]}
-            >
-              <Select placeholder="Choose task type" onChange={onTaskTypeChange}>
-                {taskDefinitions &&
-                  Object.entries(taskDefinitions).map(([key]) => {
-                    return (
-                      <Option key={key} value={key}>
-                        {key === 'daily'
-                          ? 'Daily Disinfection Tasks'
-                          : key === 'afterUse'
-                          ? 'After Every Use Disinfection Tasks'
-                          : 'Weekly Disinfection Tasks'}
-                      </Option>
-                    );
-                  })}
-              </Select>
-            </Form.Item>
+            {/* Task Type Selection */}
+            <div className="bg-purple-100 p-4 rounded-md">
+              <h2 className="text-xl font-semibold mb-4">Type of Task</h2>
+              <Form.Item
+                label="Select Task Type *"
+                name="taskType"
+                rules={[{ required: true, message: 'Please select a task type' }]}
+              >
+                <Radio.Group onChange={(e) => onTaskTypeChange(e.target.value)}>
+                  <Radio value="dailyTasks">Daily Disinfection Tasks</Radio>
+                  <Radio value="afterUseTasks">After Every Use Disinfection Tasks</Radio>
+                  <Radio value="weeklyTasks">Weekly Disinfection Tasks</Radio>
+                </Radio.Group>
+              </Form.Item>
+            </div>
 
-            {/* Task Sections */}
-            {Object.entries(taskDefinitions).map(([sectionKey, tasks]) => (
-              <div key={sectionKey} className="bg-orange-50 rounded-lg mb-6">
-                <button
-                  type="button"
-                  onClick={() => toggleSection(sectionKey)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none"
-                >
-                  <h3 className="text-orange-900 font-semibold">
-                    {sectionKey === 'daily'
-                      ? 'Daily Disinfection Tasks'
-                      : sectionKey === 'afterUse'
-                      ? 'After Every Use Disinfection Tasks'
-                      : 'Weekly Disinfection Tasks'}
-                  </h3>
-                  {expandedSections[sectionKey] ? <ChevronUp /> : <ChevronDown />}
-                </button>
-                {expandedSections[sectionKey] && (
-                  <div className="p-6 space-y-4">
-                    {tasks.map(({ key, label }) => (
-                      <Form.Item
-                        key={key}
-                        label={label}
-                        name={key}
-                        rules={[
-                          {
-                            required: form.getFieldValue('taskType') === sectionKey,
-                            message: 'Required',
-                          },
-                        ]}
-                      >
-                        <Radio.Group className="flex space-x-8">
-                          <Radio value="Yes">Yes</Radio>
-                          <Radio value="No">No</Radio>
-                        </Radio.Group>
-                      </Form.Item>
-                    ))}
-                  </div>
-                )}
+            {/* Daily Disinfection Tasks Section */}
+            {selectedTaskType === 'dailyTasks' && (
+              <div className="bg-purple-100 p-4 rounded-md">
+                <h2 className="text-xl font-semibold mb-4">Daily Disinfection Tasks</h2>
+                <div className="space-y-4">
+                  <Form.Item
+                    label="Was Transport Incubator disinfected today using Bacilloid? *"
+                    name="transportIncubator"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was Laminar Flow disinfected with Bacillocid twice today? *"
+                    name="laminarFlow"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was Neopuff disinfected with Bacillocid today? *"
+                    name="neopuff"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the Suction Jars & Tubings cleaned with soap and water, Cidex 2% glutaraldehyde, and packed with a date today? *"
+                    name="suctionJars"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was the Intubation Tray disinfected with Bacillocid today? *"
+                    name="intubationTray"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was the Bottle Steriliser cleaned with soap and water today? *"
+                    name="bottleSteriliser"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the Chitel Forceps disinfected with ETO/Cidex/2% glutaraldehyde today? *"
+                    name="chitelForceps"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the Bedside Trays disinfected today? *"
+                    name="bedsideTrays"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the Milk Preparation Trays washed with hot water and soap? *"
+                    name="milkPrepTrays"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was the Weighing Machine disinfected with Bacillocid today? *"
+                    name="weighingMachine"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
               </div>
-            ))}
+            )}
 
-            {/* Compliance Display */}
-            {form.getFieldValue('taskType') && (
-              <ComplianceDisplay
-                complianceScore={complianceObj.score}
-                complianceLevel={complianceLevel}
-                totalFields={complianceObj.totalFields}
-                completedFields={complianceObj.completedFields}
-                lowCompliance={complianceObj.score < 80}
-              />
+            {/* After Every Use Disinfection Tasks Section */}
+            {selectedTaskType === 'afterUseTasks' && (
+              <div className="bg-purple-100 p-4 rounded-md">
+                <h2 className="text-xl font-semibold mb-4">After Every Use Disinfection Tasks</h2>
+                <div className="space-y-4">
+                  <Form.Item
+                    label="Was the Laryngoscope disinfected with Chlorhexidine after use? *"
+                    name="laryngoscope"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the ventilator circuit disinfected with ETO/Cidex 2% glutaraldehyde and packed with a date after use? *"
+                    name="ventilatorCircuit"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Was the Ambu Bag dismantled, disinfected with soap and water, and sent for ETO/Cidex 2% glutaraldehyde after use? *"
+                    name="ambuBag"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the Oxygen Jars disinfected with ETO/Cidex 2% glutaraldehyde, packed, and replaced after use? *"
+                    name="oxygenJars"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
+              </div>
+            )}
+
+            {/* Weekly Disinfection Tasks Section */}
+            {selectedTaskType === 'weeklyTasks' && (
+              <div className="bg-purple-100 p-4 rounded-md">
+                <h2 className="text-xl font-semibold mb-4">Weekly Disinfection Tasks (Monday/Friday)</h2>
+                <div className="space-y-4">
+                  <Form.Item
+                    label="Was the Fridge disinfected today (Monday/Friday)? *"
+                    name="fridge"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the unused CPAP and Ventilators disinfected with Bacillocid today (Monday/Friday)? *"
+                    name="cpapVentilators"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the unused Warmers disinfected with Bacillocid 5% ecoshield, 2% cidex or 3% carbolic acid (Monday/Friday)? *"
+                    name="warmers"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Were the unused Incubators disinfected with Bacillocid today (Monday/Friday)? *"
+                    name="incubators"
+                    rules={[{ required: true, message: 'Please select an option' }]}
+                  >
+                    <Radio.Group className="flex space-x-8">
+                      <Radio value="Yes">Yes</Radio>
+                      <Radio value="No">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </div>
+              </div>
+            )}
+
+            {/* No Task Type Selected Message */}
+            {!selectedTaskType && (
+              <div className="bg-gray-50 p-6 rounded-md text-center">
+                <p className="text-gray-600">Please select a task type above to view the form fields.</p>
+              </div>
             )}
 
             {/* Submit Section */}
             <Form.Item>
-              <div className="flex justify-end space-x-4 border-t border-gray-200 pt-4">
+              <div className="flex justify-between border-t border-gray-200 pt-4">
                 <Button onClick={() => navigate('/audit')} disabled={isSubmitting}>
-                  Cancel
+                  Back to Top
                 </Button>
                 <Button
                   type="primary"
                   htmlType="submit"
                   loading={isSubmitting}
-                  disabled={!form.getFieldValue('taskType')}
+                  disabled={!selectedTaskType}
                 >
                   <Save className="mr-2" />
                   Submit

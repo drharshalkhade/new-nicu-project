@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import {
   calculateVAPCompliance,
-  getComplianceLevel,
 } from '../../utils/complianceCalculation';
 import {
   Form,
@@ -23,54 +22,91 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
 import BundleSection from '../common-components/BundleSection';
-import ComplianceDisplay from '../common-components/ComplianceDisplay';
+
 
 const { Option } = Select;
 
 const bundleFields = {
-  intubationBundle: [
-    { key: 'preSuppliesArranged', label: 'Supplies Arranged' },
-    { key: 'preIndication', label: 'Indication' },
-    { key: 'preEmergencyElective', label: 'Emergency/Elective' },
-    { key: 'preETSize', label: 'ET Tube Size' },
-    { key: 'preETDepth', label: 'ET Tube Depth' },
-    { key: 'procWearMask', label: 'Wear Mask/Gloves' },
-    { key: 'procHandWash', label: 'Hand Wash' },
-    { key: 'procAseptic', label: 'Aseptic Precautions' },
-    { key: 'procAppropriateSteps', label: 'Appropriate Steps' },
-  ],
-  reintubationBundle: [
-    { key: 'reintubationReason', label: 'Reason for Re-intubation' },
-    { key: 'reintubationChecklist', label: 'Checklist Used' },
+  intubationReintubationBundle: [
+    // Pre-Procedure Checklist
+    { key: 'preSuppliesArranged', label: 'Supplies/Equipment arranged *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'preIndication', label: 'Indication *', type: 'radio', options: ['Shock', 'Respiratory Distress', 'Neurological cause', 'NIV Failure', 'Extubation Failure', 'Desaturation', 'Surfactant Administration', 'Apnoea', 'Secretions/Block requiring Re Intubation', 'Other'], required: true },
+    { key: 'preEmergencyElective', label: 'Emergency/Elective *', type: 'radio', options: ['Emergency', 'Elective'], required: true },
+    { key: 'preETTubeSize', label: 'ET tube of appropriate size chosen *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'preETTubeDepth', label: 'Depth of ET tube insertion Calculated *', type: 'radio', options: ['Yes', 'No'], required: true },
+    // Procedure Checklist
+    { key: 'procWearMask', label: 'Wear mask, cap & gloves *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'procHandWash', label: 'Wash hands with soap and water f/b Hand Rub (As per policy) *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'procAsepticPrecautions', label: 'Strict aseptic precautions *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'procAppropriateSteps', label: 'Appropriate steps followed *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'procHandRubAfter', label: 'Handwash or hand rub after removing gloves *', type: 'radio', options: ['Yes', 'No'], required: true },
   ],
   maintenanceBundle: [
-    { key: 'maintenanceCircuitChange', label: 'Circuit Change' },
-    { key: 'maintenanceHumidification', label: 'Humidification' },
-    { key: 'maintenanceSuction', label: 'Suction' },
-    { key: 'maintenanceChecklist', label: 'Checklist Used' },
+    // Humidification
+    { key: 'humidHeated', label: 'Heated humidifier used *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'humidGasTemp', label: 'Inspired gas at 37 degrees Celsius and 100% relative humidity *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'humidAutoRefill', label: 'Auto refill technique for the humidifier to fill water *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'humidSterileWater', label: 'Sterile water used *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'humidCondensation', label: 'Condensation in inspiratory limb *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'humidDrainCondensate', label: 'Drain condensate in water trap *', type: 'radio', options: ['Yes', 'No'], required: true },
+    // Respiratory Equipment Care
+    { key: 'equipCircuits', label: 'Ventilator circuits used *', type: 'radio', options: ['New', 'Reused but sterile', 'Reused Unsterile'], required: true },
+    { key: 'equipCircuitsClean', label: 'Ventilator circuits are clean (not visibly soiled) *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'equipHandHygiene', label: 'Hand hygiene followed when handling circuit', type: 'radio', options: ['Yes', 'No'], required: false },
+    { key: 'equipCircuitPosition', label: 'Circuit positioned parallel to the baby and in dependent position *', type: 'radio', options: ['Yes', 'No'], required: true },
+    // Infant Position
+    { key: 'infantHeadElevation', label: '30 degree elevation of head end *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'infantPositionChange', label: 'Frequent changes in position *', type: 'radio', options: ['Yes', 'No'], required: true },
+    // Oral Hygiene / Enteral Feeds
+    { key: 'oralSuction', label: 'Oral suction if secretions are visible *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'oralColostrum', label: 'Oral application of Colostrum / EBM *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'ogFeeds', label: 'OG Feeds *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'feedType', label: 'Type of Feed *', type: 'radio', options: ['EBM', 'Formula', 'NPO'], required: true },
+    // Extubation Assessment
+    { key: 'extubSedation', label: 'Sedation *', type: 'radio', options: ['Stopped', 'Ongoing'], required: true },
+    { key: 'extubReadiness', label: 'Extubation Readiness Assessment *', type: 'radio', options: ['Yes', 'No'], required: true },
   ],
   etSuctionBundle: [
-    { key: 'etSuctionIndication', label: 'Indication' },
-    { key: 'etSuctionSterility', label: 'Sterility Maintained' },
-    { key: 'etSuctionChecklist', label: 'Checklist Used' },
+    { key: 'etSuctionIndicated', label: 'Clinically indicated *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionHandHygiene', label: 'Hand Hygiene As per Policy *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionSterileGloves', label: 'Sterile gloves used *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionNewCatheter', label: 'New Catheter used *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionProtected', label: 'Protected Suction *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionAseptic', label: 'Aseptic procedure *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionNoSaline', label: 'Saline NOT used during suction *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionOralNasal', label: 'Suction of Oral f/b Nasal cavity after ET Suction *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'etSuctionDisposal', label: 'Used Appropriate disposal of Gloves & Catheter *', type: 'radio', options: ['Yes', 'No'], required: true },
   ],
   extubationBundle: [
-    { key: 'extubationReadiness', label: 'Readiness Assessed' },
-    { key: 'extubationChecklist', label: 'Checklist Used' },
+    { key: 'extubDate', label: 'Date of extubation *', type: 'date', required: true },
+    { key: 'extubReason', label: 'Reason for Extubation *', type: 'radio', options: ['IntubatedOutside', 'AccidentalExtubation', 'ETBlock', 'PlannedExtubation'], required: true },
+    // Pre-Extubation
+    { key: 'preExtubSettings', label: 'Ventilator Settings: *', type: 'radio', options: ['Extubatable', 'NonExtubatable'], required: true },
+    { key: 'preExtubDrugs', label: 'Appropriate Drugs Administered *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'preExtubStability', label: 'Clinical stability assessed *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'preExtubSBT', label: 'Spontaneous Breathing Trial *', type: 'radio', options: ['Passed', 'NotPassed', 'NotGiven'], required: true },
+    // Extubation Preparation
+    { key: 'extubPrepPeople', label: '2 people involved *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'extubPrepSupplies', label: 'Supplies/Equipment arranged *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'extubPrepSteps', label: 'Extubation: Appropriate Steps used *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'extubPrepSupport', label: 'Appropriate respiratory support used Post-Extubation *', type: 'radio', options: ['Yes', 'No'], required: true },
   ],
   postExtubationBundle: [
-    { key: 'postExtubationSupport', label: 'Support Provided' },
-    { key: 'postExtubationChecklist', label: 'Checklist Used' },
+    { key: 'postExtubSupport', label: 'Respiratory support used *', type: 'radio', options: ['NIPPV', 'CPAP', 'HFNC', 'HOODBOX', 'LFNC', 'RoomAir'], required: true },
+    { key: 'postExtubNebulization', label: 'Nebulization *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'postExtubPositionChange', label: 'Position change every 2 hrs (Continue every 2 hrs) *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'postExtubSuction', label: 'Suction *', type: 'radio', options: ['Yes', 'No'], required: true },
+    { key: 'postExtubMonitoring', label: 'Monitoring (From Radar: Vitals, RDS Score) *', type: 'radio', options: ['Yes', 'No'], required: true },
   ],
 };
 
 const bundleOptions = [
-  { key: 'intubationBundle', label: 'Intubation Bundle' },
-  { key: 'reintubationBundle', label: 'Re-intubation Bundle' },
+  { key: 'intubationReintubationBundle', label: 'Intubation Bundle' },
+  { key: 'intubationReintubationBundle', label: 'Reintubation Bundle' },
   { key: 'maintenanceBundle', label: 'Maintenance Bundle' },
   { key: 'etSuctionBundle', label: 'ET Suction Bundle' },
   { key: 'extubationBundle', label: 'Extubation Bundle' },
-  { key: 'postExtubationBundle', label: 'Post Extubation Bundle' },
+  { key: 'postExtubationBundle', label: 'Post-Extubation Care Bundle' },
 ];
 
 const VAPForm = () => {
@@ -115,8 +151,8 @@ const VAPForm = () => {
         time: new Date().toTimeString().slice(0, 5),
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
-        nicuAreas: nicuAreas.find((n) => n.id === values.nicuAreas)?.name || 'Unknown Area',
-        nicuAreasId: values.nicuAreas,
+        nicuAreas: nicuAreas.find((n) => n.id === values.nicuArea)?.name || 'Unknown Area',
+        nicuAreasId: values.nicuArea,
         bundleSelection: values.bundleSelection,
         compliance: complianceData.score / 100,
         notes: `VAP Audit - ${values.bundleSelection} - Patient: ${values.patientName}`,
@@ -153,7 +189,6 @@ const VAPForm = () => {
 
   const formValues = form.getFieldsValue();
   const complianceData = calculateVAPCompliance(formValues);
-  const complianceLevel = getComplianceLevel(complianceData.score);
   const isLow = complianceData.score < 80;
 
   return (
@@ -163,7 +198,7 @@ const VAPForm = () => {
           form={form}
           layout="vertical"
           onFinish={onFinish}
-          initialValues={{ bundleSelection: '', nicuAreas: '' }}
+          initialValues={{ bundleSelection: '', nicuArea: '' }}
           scrollToFirstError
         >
           {/* Header */}
@@ -176,7 +211,7 @@ const VAPForm = () => {
               className="text-white"
             />
             <div>
-              <h1 className="text-2xl font-semibold">VAP Audit</h1>
+              <h1 className="text-2xl font-semibold">VAP Bundle Audit</h1>
               <p className="text-green-200 text-sm">2025 - Ventilator-Associated Pneumonia Prevention</p>
             </div>
             <div className="ml-auto bg-green-800 rounded-full px-3 py-1 font-semibold text-lg">
@@ -188,21 +223,21 @@ const VAPForm = () => {
             {/* Patient Info & NICU Area */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Form.Item
-                label="Patient Name"
+                label="Patient Name *"
                 name="patientName"
                 rules={[{ required: true, message: 'Please enter patient name' }]}
               >
                 <Input placeholder="Enter patient name" />
               </Form.Item>
               <Form.Item
-                label="Staff Name"
+                label="Bedside Staff Name"
                 name="staffName"
               >
                 <Input placeholder="Enter staff name" />
               </Form.Item>
               <Form.Item
                 label="NICU Area"
-                name="nicuAreas"
+                name="nicuArea"
                 rules={[{ required: true, message: 'Please select NICU area' }]}
               >
                 {loadingAreas ? (
@@ -221,7 +256,7 @@ const VAPForm = () => {
 
             {/* Bundle Selection */}
             <Form.Item
-              label="Bundle Selection"
+              label="Select Bundle *"
               name="bundleSelection"
               rules={[{ required: true, message: 'Please select a bundle' }]}
             >
@@ -243,16 +278,7 @@ const VAPForm = () => {
               />
             )}
 
-            {/* Compliance Display */}
-            {visibleSection && (
-              <ComplianceDisplay
-                complianceScore={complianceData.score}
-                complianceLevel={complianceLevel}
-                totalFields={complianceData.totalFields}
-                completedFields={complianceData.completedFields}
-                lowCompliance={isLow}
-              />
-            )}
+
 
             {/* Submit Buttons */}
             <div className="flex justify-between">

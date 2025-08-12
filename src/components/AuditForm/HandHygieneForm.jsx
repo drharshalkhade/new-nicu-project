@@ -18,10 +18,10 @@ import {
 } from 'antd';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
-import { calculateHandHygieneCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+import { calculateHandHygieneCompliance } from '../../utils/complianceCalculation';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-import ComplianceDisplay from '../common-components/ComplianceDisplay';
+
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -90,7 +90,7 @@ const HandHygieneForm = () => {
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
         staffRole: values.hcp ? values.hcp.join(', ') : 'Unknown',
-        nicuArea: values.hospitalName || 'Unknown Area',
+        nicuArea: values.nicuArea || 'Unknown Area',
         nicuAreaId: values.nicuAreaId,
         moments,
         compliance: complianceResult.score / 100,
@@ -146,7 +146,6 @@ const HandHygieneForm = () => {
   }
 
   const complianceDetails = calculateCompliance(form.getFieldsValue());
-  const complianceLevel = getComplianceLevel(complianceDetails.score);
   const isLowCompliance = complianceDetails.score / 100 < 0.8;
 
   return (
@@ -197,8 +196,8 @@ const HandHygieneForm = () => {
                 <Input placeholder="Enter staff name" />
               </Form.Item>
               <Form.Item
-                label="Hospital Name"
-                name="hospitalName"
+                label="NICU Area"
+                name="nicuArea"
                 rules={[{ required: true, message: 'Please select an NICU area' }]}
               >
                 <Select
@@ -306,26 +305,17 @@ const HandHygieneForm = () => {
                 ))}
               </Radio.Group>
             </Form.Item>
-            <Form.Item shouldUpdate={(prev, cur) => prev.glovesRequired !== cur.glovesRequired}>
-              {({ getFieldValue }) =>
-                getFieldValue('glovesRequired') === 'Yes' && (
-                  <Form.Item
-                    label="Gloves Required For"
-                    name="glovesRequiredFor"
-                    rules={[
-                      { required: true, message: 'Please select at least one option' },
-                    ]}
-                  >
-                    <Checkbox.Group>
-                      {glovesRequiredForOptions.map(option => (
-                        <Checkbox key={option} value={option}>
-                          {option}
-                        </Checkbox>
-                      ))}
-                    </Checkbox.Group>
-                  </Form.Item>
-                )
-              }
+            <Form.Item
+              label="Gloves Required For"
+              name="glovesRequiredFor"
+            >
+              <Checkbox.Group>
+                {glovesRequiredForOptions.map(option => (
+                  <Checkbox key={option} value={option}>
+                    {option}
+                  </Checkbox>
+                ))}
+              </Checkbox.Group>
             </Form.Item>
             <Form.Item
               label="Gloves Used"
@@ -355,14 +345,7 @@ const HandHygieneForm = () => {
             </Form.Item>
           </div>
 
-          {/* Compliance Display */}
-          <ComplianceDisplay
-            complianceScore={complianceDetails.score}
-            complianceLevel={complianceLevel}
-            totalFields={complianceDetails.totalFields}
-            completedFields={complianceDetails.completedFields}
-            lowCompliance={isLowCompliance}
-          />
+
 
           {/* Comments */}
           <Form.Item label="Any Comments" name="comments">

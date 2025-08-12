@@ -10,9 +10,9 @@ import { Form, Input, Select, Radio, Button, message, Spin } from 'antd';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
-import { calculateNIVCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+import { calculateNIVCompliance } from '../../utils/complianceCalculation';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-import ComplianceDisplay from '../common-components/ComplianceDisplay';
+
 
 const { Option } = Select;
 
@@ -69,7 +69,7 @@ const NIVForm = () => {
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
         staffRole: 'NIV Audit',
-        nicuArea: values.hospitalName || 'Unknown Area',
+        nicuArea: values.nicuArea || 'Unknown Area',
         nicuAreaId: values.nicuAreaId,
         moments: {
           beforePatientContact: false,
@@ -112,7 +112,6 @@ const NIVForm = () => {
   }
 
   const complianceDetails = calculateNIVCompliance(form.getFieldsValue());
-  const complianceLevel = getComplianceLevel(complianceDetails.score);
   const isLowCompliance = complianceDetails.score / 100 < 0.8;
 
   return (
@@ -159,8 +158,8 @@ const NIVForm = () => {
               <Input placeholder="Enter bedside staff name" />
             </Form.Item>
             <Form.Item
-              label="Hospital Name"
-              name="hospitalName"
+              label="NICU Area"
+              name="nicuArea"
               rules={[{ required: true, message: 'Please select NICU Area' }]}
             >
               {loadingAreas ? (
@@ -401,16 +400,7 @@ const NIVForm = () => {
             </div>
           )}
 
-          {/* Compliance Rate Display */}
-          {form.getFieldValue('respiratorySupport') && (
-            <ComplianceDisplay
-              complianceScore={complianceDetails.score}
-              complianceLevel={complianceLevel}
-              totalFields={complianceDetails.totalFields}
-              completedFields={complianceDetails.completedFields}
-              lowCompliance={isLowCompliance}
-            />
-          )}
+
 
           {/* Submit Section */}
           <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">

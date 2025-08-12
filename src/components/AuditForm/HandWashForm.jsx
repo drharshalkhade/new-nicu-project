@@ -20,9 +20,9 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { useSupabaseAudits } from "../../hooks/useSupabaseAudits";
 import { useAuth } from "../../hooks/useAuth";
-import { calculateHandWashCompliance, getComplianceLevel } from "../../utils/complianceCalculation";
+import { calculateHandWashCompliance } from "../../utils/complianceCalculation";
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-import ComplianceDisplay from '../common-components/ComplianceDisplay';
+
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -81,9 +81,9 @@ const HandWashForm = () => {
         observerName: user?.name || "Unknown Observer",
         nicuAreas: nicuAreas.find((n) => n.id === values.nicuAreaId)?.name || "Unknown Area",
         nicuAreaId: values.nicuAreaId,
-        hospitalName: values.hospitalName,
+        nicuArea: values.nicuArea,
         complianceScore: complianceData.score,
-        complianceLevel: getComplianceLevel(complianceData.score),
+
         patientName: values.patientName,
         bedsideName: values.bedsideName,
         image: imageFile || null,
@@ -131,7 +131,6 @@ const HandWashForm = () => {
 
   const currentValues = form.getFieldsValue();
   const complianceData = calculateHandWashCompliance(currentValues);
-  const complianceLevel = getComplianceLevel(complianceData.score);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -178,8 +177,8 @@ const HandWashForm = () => {
                   <Input placeholder="Enter staff name" />
                 </Form.Item>
                 <Form.Item
-                  label="Hospital Name *"
-                  name="hospitalName"
+                  label="NICU Area *"
+                  name="nicuArea"
                   rules={[{ required: true, message: "Please select a NICU area" }]}
                 >
                   {loadingAreas ? (
@@ -254,14 +253,7 @@ const HandWashForm = () => {
 
 
 
-            {/* Compliance Display */}
-            <ComplianceDisplay
-              complianceScore={complianceData.score}
-              complianceLevel={complianceLevel}
-              totalFields={complianceData.totalFields}
-              completedFields={complianceData.completedFields}
-              lowCompliance={complianceData.score < 80}
-            />
+
 
 
 
