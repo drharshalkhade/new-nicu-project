@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Save,
-  AlertCircle,
   ArrowLeft,
 } from 'lucide-react';
 import {
@@ -17,7 +16,7 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '../../hooks/useAuth';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
-import { calculateDisinfectionCompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
 
 const { Option } = Select;
@@ -32,7 +31,6 @@ const DisinfectionForm = () => {
   const loadingAreas = useSelector(state => state.nicuArea.loading);
 
   const [selectedTaskType, setSelectedTaskType] = useState('');
-  const [submitStatus, setSubmitStatus] = useState('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form] = Form.useForm();
 
@@ -46,20 +44,11 @@ const DisinfectionForm = () => {
     setSelectedTaskType(value);
   };
 
-  const computeCompliance = (values) => {
-    try {
-      const result = calculateDisinfectionCompliance(values);
-      return result;
-    } catch {
-      return { score: 0, ...getComplianceLevel(0) };
-    }
-  };
+
 
   const onFinish = async (values) => {
     setIsSubmitting(true);
-    setSubmitStatus('idle');
     try {
-      const complianceObj = computeCompliance(values);
       const auditData = {
         type: 'disinfection',
         date: new Date().toISOString().slice(0, 10),
@@ -72,25 +61,21 @@ const DisinfectionForm = () => {
         taskValues: Object.fromEntries(
           Object.entries(values).filter(([key]) => key !== 'nicuArea' && key !== 'nicuAreaId' && key !== 'taskType' && key !== 'email' && key !== 'staffName')
         ),
-        complianceScore: complianceObj.score,
-        complianceLevel: complianceObj,
+
         notes: `Disinfection audit - Staff: ${values.staffName || 'N/A'}`,
       };
       await createAudit(auditData);
-      setSubmitStatus('success');
       message.success('Disinfection audit submitted successfully!');
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error) {
       console.error(error);
-      setSubmitStatus('error');
       message.error('Failed to submit audit. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const complianceObj = computeCompliance(form.getFieldsValue());
-  const complianceLevel = getComplianceLevel(complianceObj.score);
+
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -102,29 +87,16 @@ const DisinfectionForm = () => {
           scrollToFirstError
           initialValues={{ taskType: '', nicuArea: '', email: user?.email }}
         >
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-600 to-orange-700 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                type="text"
-                onClick={() => navigate('/audit')}
-                icon={<ArrowLeft />}
-                className="text-orange-100 hover:text-white"
-              />
-              <div>
-                <h1 className="text-white text-2xl font-bold">Disinfection Audits</h1>
-                <p className="text-orange-100 text-sm">2025 - Equipment and Environment Disinfection</p>
-              </div>
-            </div>
-            <div
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                complianceLevel.color === 'green'
-                  ? 'bg-green-100 text-green-800'
-                  : complianceLevel.color === 'yellow'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}
-            >
-              {complianceObj.score.toFixed(1)}% Compliance
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-orange-600 to-orange-700 flex items-center space-x-4">
+            <Button
+              type="text"
+              onClick={() => navigate('/audit')}
+              icon={<ArrowLeft />}
+              className="text-orange-100 hover:text-white"
+            />
+            <div>
+              <h1 className="text-white text-2xl font-bold">Disinfection Audits</h1>
+              <p className="text-orange-100 text-sm">2025 - Equipment and Environment Disinfection</p>
             </div>
           </div>
 

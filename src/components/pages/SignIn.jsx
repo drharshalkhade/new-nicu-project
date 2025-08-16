@@ -35,12 +35,8 @@ export default function SignIn() {
     message.error(error.message)
   } else {
     message.success('Signed in successfully!')
-
-    // Fetch user details and update redux
-    dispatch(fetchUserDetails()).then(() => {
-      // Navigate after successful fetch
-      navigate('/dashboard') 
-    })
+    // The useAuth hook will automatically fetch user details
+    navigate('/dashboard')
   }
 }
 

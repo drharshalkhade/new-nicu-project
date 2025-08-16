@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Building, Calendar, CreditCard, MapPin, Plus, Settings as SettingsIcon, Users, Save, X, Edit } from 'lucide-react';
+import { Building, CreditCard, MapPin, Plus, Settings as SettingsIcon, Users, Save, X, Edit } from 'lucide-react';
 import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess';
 import { supabase } from '../../lib/supabaseClient';
 import { signUp } from '../../utils/signUp';
@@ -159,20 +159,39 @@ const Settings = () => {
       
       if (orgError) throw orgError;
 
+      // Generate a secure temporary password
+      const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).toUpperCase().slice(-4) + '!1';
+      
       const { error: signUpError } = await signUp(
         values.adminEmail,
-        'temp123!',
+        tempPassword,
         {
           name: values.adminName,
           organization_id: orgData.id,
-          role: 'admin',
+          role: 'hospital_admin',
           department: values.adminDepartment
         }
       );
       
       if (signUpError) throw signUpError;
 
-      message.success(`Organization "${values.name}" and admin account created successfully!`);
+      message.success({
+        content: (
+          <div>
+            <div>Organization "{values.name}" and admin account created successfully!</div>
+            <div className="mt-2 text-sm">
+              <strong>Temporary password for {values.adminEmail}:</strong> {tempPassword}
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              Please share this password with the admin. They should change it on first login.
+            </div>
+          </div>
+        ),
+        duration: 10,
+        style: {
+          marginTop: '20vh',
+        },
+      });
       organizationForm.resetFields();
       await fetchOrganizations();
     } catch (err) {
@@ -323,12 +342,14 @@ const Settings = () => {
       title: 'Organization',
       dataIndex: 'name',
       key: 'name',
+      responsive: ['md'],
       render: (text) => <span className="font-medium">{text}</span>,
     },
     {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
+      responsive: ['sm'],
       render: (type) => (
         <Tag color="blue">{type?.replace('_', ' ') || 'N/A'}</Tag>
       ),
@@ -337,6 +358,7 @@ const Settings = () => {
       title: 'Status',
       dataIndex: 'subscription_status',
       key: 'subscription_status',
+      responsive: ['lg'],
       render: (status) => {
         const color = status === 'active' ? 'green' : status === 'trial' ? 'blue' : 'red';
         return <Tag color={color}>{status || 'N/A'}</Tag>;
@@ -346,12 +368,14 @@ const Settings = () => {
       title: 'Subscription',
       dataIndex: 'subscription_tier',
       key: 'subscription_tier',
+      responsive: ['xl'],
       render: (tier) => <Tag color="green">{tier || 'N/A'}</Tag>,
     },
     {
       title: 'Created',
       dataIndex: 'created_at',
       key: 'created_at',
+      responsive: ['lg'],
       render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
     },
   ];
@@ -381,11 +405,11 @@ const Settings = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Settings</h1>
+        <p className="text-gray-600 mt-1 text-sm sm:text-base">
           Manage {isSuperAdmin ? 'organizations, users, and system' : 'organization'} settings
         </p>
       </div>
@@ -402,10 +426,15 @@ const Settings = () => {
       )}
 
       {/* Tabs */}
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        className="settings-tabs"
+        size="small"
+      >
         {/* Organization Management (Super Admin Only) */}
         {isSuperAdmin && (
-          <TabPane tab={<span><Building className="h-4 w-4 inline mr-2" />Organizations</span>} key="organization">
+          <TabPane tab={<span><Building className="h-4 w-4 inline mr-1 sm:mr-2" />Organizations</span>} key="organization">
             <div className="space-y-6">
               <Card title="Create New Organization" className="mb-6">
                 <Form
@@ -413,7 +442,7 @@ const Settings = () => {
                   layout="vertical"
                   onFinish={createOrganization}
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <InputField
                       label="Organization Name"
                       name="name"
@@ -464,20 +493,74 @@ const Settings = () => {
               </Card>
 
               <Card title="Existing Organizations">
-                <Table
-                  dataSource={organizations}
-                  columns={organizationColumns}
-                  rowKey="id"
-                  pagination={false}
-                  loading={loading}
-                />
+                {/* Desktop Table */}
+                <div className="hidden md:block">
+                  <Table
+                    dataSource={organizations}
+                    columns={organizationColumns}
+                    rowKey="id"
+                    pagination={false}
+                    loading={loading}
+                    scroll={{ x: 800 }}
+                    size="small"
+                  />
+                </div>
+
+                {/* Mobile Card Layout */}
+                <div className="md:hidden">
+                  {loading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-gray-500">Loading organizations...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {organizations.map((org) => (
+                        <div key={org.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-medium text-gray-900">{org.name}</h3>
+                              <p className="text-sm text-gray-500">{org.type?.replace('_', ' ') || 'N/A'}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Tag color="blue">{org.type?.replace('_', ' ') || 'N/A'}</Tag>
+                              {org.subscription_status && (
+                                <Tag color={org.subscription_status === 'active' ? 'green' : org.subscription_status === 'trial' ? 'blue' : 'red'}>
+                                  {org.subscription_status}
+                                </Tag>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2 text-sm">
+                            {org.subscription_tier && (
+                              <div>
+                                <span className="font-medium">Subscription:</span> {org.subscription_tier}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-medium">Created:</span> {org.created_at ? new Date(org.created_at).toLocaleDateString() : 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {organizations.length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Building className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <p>No organizations found</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </Card>
             </div>
           </TabPane>
         )}
 
         {/* NICU Areas Management */}
-        <TabPane tab={<span><MapPin className="h-4 w-4 inline mr-2" />NICU Areas</span>} key="areas">
+        <TabPane tab={<span><MapPin className="h-4 w-4 inline mr-1 sm:mr-2" />NICU Areas</span>} key="areas">
           <div className="space-y-6">
             <Card title="Add New NICU Area" className="mb-6">
               <Form
@@ -485,7 +568,7 @@ const Settings = () => {
                 layout="vertical"
                 onFinish={createNICUArea}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <InputField
                     label="Area Name"
                     name="name"
@@ -526,7 +609,7 @@ const Settings = () => {
                           onFinish={(values) => updateNICUArea({ ...editingArea, ...values })}
                           layout="vertical"
                         >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <InputField
                               label="Area Name"
                               name="name"
@@ -550,22 +633,24 @@ const Settings = () => {
                           </Space>
                         </Form>
                       ) : (
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="flex-1">
                             <h4 className="font-medium text-gray-900">{area?.name}</h4>
                             <p className="text-sm text-gray-600">{area?.description}</p>
                             <Tag color={area?.is_active ? 'green' : 'red'} className="mt-1">
                               {area?.is_active ? 'Active' : 'Inactive'}
                             </Tag>
                           </div>
-                          <Button
-                            type="primary"
-                            size="small"
-                            onClick={() => setEditingArea(area)}
-                            icon={<Edit className="h-3 w-3" />}
-                          >
-                            Edit
-                          </Button>
+                          <div className="flex justify-end">
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={() => setEditingArea(area)}
+                              icon={<Edit className="h-3 w-3" />}
+                            >
+                              Edit
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </Card>
@@ -577,7 +662,7 @@ const Settings = () => {
         </TabPane>
 
         {/* User Management */}
-        <TabPane tab={<span><Users className="h-4 w-4 inline mr-2" />Users</span>} key="users">
+        <TabPane tab={<span><Users className="h-4 w-4 inline mr-1 sm:mr-2" />Users</span>} key="users">
           <Card title="Add New User" className="mb-6">
             <Form
               form={userForm}
@@ -638,7 +723,7 @@ const Settings = () => {
         </TabPane>
 
         {/* Subscription Management */}
-        <TabPane tab={<span><CreditCard className="h-4 w-4 inline mr-2" />Subscription</span>} key="subscription">
+        <TabPane tab={<span><CreditCard className="h-4 w-4 inline mr-1 sm:mr-2" />Subscription</span>} key="subscription">
           <div className="space-y-6">
             <Card title={isSuperAdmin ? 'Create New Subscription' : 'Current Subscription'}>
               {isSuperAdmin ? (

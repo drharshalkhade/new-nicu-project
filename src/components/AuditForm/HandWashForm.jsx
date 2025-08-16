@@ -20,11 +20,9 @@ import {
 import { useSelector, useDispatch } from "react-redux";
 import { useSupabaseAudits } from "../../hooks/useSupabaseAudits";
 import { useAuth } from "../../hooks/useAuth";
-import { calculateHandWashCompliance } from "../../utils/complianceCalculation";
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
 
 
-const { TextArea } = Input;
 const { Option } = Select;
 
 const HandWashForm = () => {
@@ -72,8 +70,6 @@ const HandWashForm = () => {
   const onFinish = async (values) => {
     setSubmitting(true);
     try {
-      // Calculate compliance score and details
-      const complianceData = calculateHandWashCompliance(values);
       const auditRecord = {
         date: new Date().toISOString().slice(0, 10),
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -82,7 +78,6 @@ const HandWashForm = () => {
         nicuAreas: nicuAreas.find((n) => n.id === values.nicuAreaId)?.name || "Unknown Area",
         nicuAreaId: values.nicuAreaId,
         nicuArea: values.nicuArea,
-        complianceScore: complianceData.score,
 
         patientName: values.patientName,
         bedsideName: values.bedsideName,
@@ -130,7 +125,6 @@ const HandWashForm = () => {
   }
 
   const currentValues = form.getFieldsValue();
-  const complianceData = calculateHandWashCompliance(currentValues);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -159,9 +153,6 @@ const HandWashForm = () => {
               <p className="text-cyan-100 text-sm">
                 2025 - SUMANK Protocol Compliance Assessment
               </p>
-            </div>
-            <div className="ml-auto bg-cyan-800 px-3 py-1 rounded-full text-lg font-semibold">
-              {complianceData.score.toFixed(1)}%
             </div>
           </div>
 

@@ -14,7 +14,7 @@ const ROLE_PERMISSIONS = {
     canManageSettings: true,
     canManageSubscriptions: true,
   },
-  admin: {
+  hospital_admin: {
     canView: true,
     canCreate: true,
     canEdit: true,
@@ -71,7 +71,7 @@ export const useRoleBasedAccess = () => {
   const canAccessAuditType = () => hasPermission('canView');
 
   const canAccessNICUArea = () => {
-    if (['super_admin', 'admin'].includes(role)) return true;
+    if (['super_admin', 'hospital_admin'].includes(role)) return true;
     if (role === 'auditor') return hasPermission('canViewAllAreas');
     return false;
   };
@@ -114,7 +114,7 @@ export const useRoleBasedAccess = () => {
     getAccessibleAuditTypes,
     getNavigationItems,
     checkSubscriptionAccess,
-    isAdmin: ['admin', 'super_admin'].includes(role),
+    isAdmin: ['hospital_admin', 'super_admin'].includes(role),
     isSuperAdmin: role === 'super_admin',
     isAuditor: role === 'auditor',
   };

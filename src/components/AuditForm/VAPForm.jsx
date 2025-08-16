@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle,
   CheckCircle,
   ArrowLeft,
 } from 'lucide-react';
-import {
-  calculateVAPCompliance,
-} from '../../utils/complianceCalculation';
+
 import {
   Form,
   Input,
@@ -145,7 +142,6 @@ const VAPForm = () => {
   const onFinish = async (values) => {
     setIsSubmitting(true);
     try {
-      const complianceData = calculateVAPCompliance(values);
       const auditRecord = {
         date: new Date().toISOString().slice(0, 10),
         time: new Date().toTimeString().slice(0, 5),
@@ -154,7 +150,6 @@ const VAPForm = () => {
         nicuAreas: nicuAreas.find((n) => n.id === values.nicuArea)?.name || 'Unknown Area',
         nicuAreasId: values.nicuArea,
         bundleSelection: values.bundleSelection,
-        compliance: complianceData.score / 100,
         notes: `VAP Audit - ${values.bundleSelection} - Patient: ${values.patientName}`,
         patientName: values.patientName,
         staffName: values.staffName,
@@ -188,8 +183,6 @@ const VAPForm = () => {
   }
 
   const formValues = form.getFieldsValue();
-  const complianceData = calculateVAPCompliance(formValues);
-  const isLow = complianceData.score < 80;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -213,9 +206,6 @@ const VAPForm = () => {
             <div>
               <h1 className="text-2xl font-semibold">VAP Bundle Audit</h1>
               <p className="text-green-200 text-sm">2025 - Ventilator-Associated Pneumonia Prevention</p>
-            </div>
-            <div className="ml-auto bg-green-800 rounded-full px-3 py-1 font-semibold text-lg">
-              {complianceData.score.toFixed(1)}%
             </div>
           </div>
 

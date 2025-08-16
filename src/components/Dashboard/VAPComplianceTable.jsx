@@ -41,6 +41,26 @@ const VAPComplianceTable = () => {
   const months = vapData.months || [];
   const loading = !initialized;
 
+  // VAP Bundle categories based on the form options
+  const bundleCategories = [
+    'Intubation Bundle',
+    'Reintubation Bundle', 
+    'Maintenance Bundle',
+    'ET Suction Bundle',
+    'Extubation Bundle',
+    'Post-Extubation Care Bundle'
+  ];
+
+  // Transform data to show multiple bundle types like NIV table
+  const transformedData = bundleCategories.map(bundle => {
+    const row = { bundle };
+    months.forEach(month => {
+      const monthData = complianceData.find(item => item.bundle === bundle && item.month === month);
+      row[month] = monthData?.compliance || 'N/A';
+    });
+    return row;
+  });
+
   // Dynamically generate columns: first is bundle, then months
   const columns = [
     { key: 'bundle', label: 'Bundle', className: 'text-left' },
@@ -52,7 +72,7 @@ const VAPComplianceTable = () => {
       title="VAP Bundle Compliance by Month"
       subtitle="Last 6 months"
       columns={columns}
-      data={complianceData}
+      data={transformedData}
       loading={loading}
       getCellClass={getComplianceColor}
       emptyMessage={

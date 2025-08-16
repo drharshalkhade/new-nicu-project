@@ -85,8 +85,6 @@ const HandHygieneForm = () => {
       };
       const complianceResult = calculateHandHygieneCompliance(values);
       const auditRecord = {
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toTimeString().slice(0, 5),
         observerId: user?.id || 'unknown',
         observerName: user?.name || 'Unknown Observer',
         staffRole: values.hcp ? values.hcp.join(', ') : 'Unknown',
@@ -181,12 +179,8 @@ const HandHygieneForm = () => {
         >
           {/* Basic Info Section */}
           <div className="bg-gray-50 p-6 rounded-lg">
-            <div className="flex justify-between items-center mb-4">
+            <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
-              <div className="text-sm text-gray-600 bg-white px-3 py-2 rounded-md border">
-                <div className="font-medium">Current Date & Time</div>
-                <div>{new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</div>
-              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Form.Item label="Patient Name" name="patientName">

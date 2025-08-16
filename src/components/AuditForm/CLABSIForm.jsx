@@ -9,7 +9,7 @@ import {
 import { Form, Input, Select, Radio, Button, message, Spin } from 'antd';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { useSelector, useDispatch } from 'react-redux';
-import { calculateCLABSICompliance, getComplianceLevel } from '../../utils/complianceCalculation';
+
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
 
 const { Option } = Select;
@@ -64,42 +64,26 @@ const CLABSIForm = () => {
     }
   };
 
-  // Determine compliance level for display
   const formValues = form.getFieldsValue();
-  const compliance = calculateCLABSICompliance(formValues);
-  const complianceLevel = getComplianceLevel(compliance.score);
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                type="text"
-                onClick={() => navigate('/audit')}
-                icon={<ArrowLeft className="h-5 w-5" />}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <span>Back</span>
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">CLABSI Checklist</h1>
-                <p className="text-gray-600 mt-1">
-                  Central Line-Associated Bloodstream Infection Prevention
-                </p>
-              </div>
-            </div>
-            <div
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                complianceLevel.color === 'green'
-                  ? 'bg-green-100 text-green-800'
-                  : complianceLevel.color === 'yellow'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}
+          <div className="flex items-center space-x-4">
+            <Button
+              type="text"
+              onClick={() => navigate('/audit')}
+              icon={<ArrowLeft className="h-5 w-5" />}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
             >
-              {compliance.score.toFixed(1)}% Compliance
+              <span>Back</span>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">CLABSI Checklist</h1>
+              <p className="text-gray-600 mt-1">
+                Central Line-Associated Bloodstream Infection Prevention
+              </p>
             </div>
           </div>
         </div>

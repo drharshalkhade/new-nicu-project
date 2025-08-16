@@ -18,6 +18,49 @@ const formatEndDateForQuery = (date) => {
   return date.toISOString().split('T')[0] + 'T23:59:59.999Z'
 }
 
+// Helper function to apply hierarchy filters to audit records query
+const applyHierarchyFilters = async (query, filters) => {
+  // Only nicu_area_id exists directly in audit_records table
+  if (filters.nicuAreaId) {
+    query = query.eq('nicu_area_id', filters.nicuAreaId)
+    return query
+  }
+  
+  // For hospital and department filters, we need to get the nicu_area_ids
+  // that belong to the selected hospital/department
+  if (filters.hospitalId || filters.departmentId) {
+    let nicuAreaQuery = supabase
+      .from('nicu_areas')
+      .select('id')
+      .eq('is_active', true)
+    
+    if (filters.hospitalId) {
+      nicuAreaQuery = nicuAreaQuery.eq('hospital_id', filters.hospitalId)
+    }
+    
+    if (filters.departmentId) {
+      nicuAreaQuery = nicuAreaQuery.eq('department_id', filters.departmentId)
+    }
+    
+    const { data: nicuAreaIds, error } = await nicuAreaQuery
+    
+    if (error) {
+      console.error('Error fetching NICU area IDs for filtering:', error)
+      return query
+    }
+    
+    if (nicuAreaIds && nicuAreaIds.length > 0) {
+      const ids = nicuAreaIds.map(area => area.id)
+      query = query.in('nicu_area_id', ids)
+    } else {
+      // If no NICU areas found, return empty result
+      query = query.eq('nicu_area_id', '00000000-0000-0000-0000-000000000000') // Non-existent ID
+    }
+  }
+  
+  return query
+}
+
 // Create Hand Hygiene Audit
 export const createHandHygieneAudit = (audit) => async (dispatch) => {
   try {
@@ -61,12 +104,16 @@ export const createVAPAudit = (audit) => async (dispatch) => {
 }
 
 // Centralized dashboard data fetching
-export const fetchDashboardData = (organizationId) => async (dispatch) => {
+export const fetchDashboardData = (organizationId, filters = {}) => async (dispatch) => {
+  console.log('fetchDashboardData called with organizationId:', organizationId)
+  
   if (!organizationId) {
+    console.log('No organizationId provided, skipping dashboard data fetch')
     return
   }
 
   try {
+    console.log('Starting dashboard data fetch for organization:', organizationId)
     dispatch(setDashboardLoading(true))
     dispatch(setDashboardError(null))
 
@@ -79,12 +126,12 @@ export const fetchDashboardData = (organizationId) => async (dispatch) => {
       clabsiData,
       disinfectionData
     ] = await Promise.allSettled([
-      fetchHandHygieneCompliance(organizationId),
-      fetchHandWashCompliance(organizationId),
-      fetchVAPCompliance(organizationId),
-      fetchNIVCompliance(organizationId),
-      fetchCLABSICompliance(organizationId),
-      fetchDisinfectionCompliance(organizationId)
+      fetchHandHygieneCompliance(organizationId, 6, filters),
+      fetchHandWashCompliance(organizationId, 6, filters),
+      fetchVAPCompliance(organizationId, 6, filters),
+      fetchNIVCompliance(organizationId, 6, filters),
+      fetchCLABSICompliance(organizationId, 6, filters),
+      fetchDisinfectionCompliance(organizationId, 6, filters)
     ])
 
     // Handle each result individually
@@ -105,7 +152,7 @@ export const fetchDashboardData = (organizationId) => async (dispatch) => {
 }
 
 // Individual data fetching functions
-const fetchHandHygieneCompliance = async (organizationId, months = 6) => {
+const fetchHandHygieneCompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const results = []
     for (let i = months - 1; i >= 0; i--) {
@@ -120,13 +167,18 @@ const fetchHandHygieneCompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
         .eq('audit_type', 'hand_hygiene')
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
+
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching hand hygiene data:', error)
@@ -167,7 +219,7 @@ const fetchHandHygieneCompliance = async (organizationId, months = 6) => {
   }
 }
 
-const fetchHandWashCompliance = async (organizationId, months = 6) => {
+const fetchHandWashCompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const results = []
     for (let i = months - 1; i >= 0; i--) {
@@ -182,13 +234,18 @@ const fetchHandWashCompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
         .eq('audit_type', 'hand_wash')
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
+
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching hand wash data:', error)
@@ -213,7 +270,7 @@ const fetchHandWashCompliance = async (organizationId, months = 6) => {
   }
 }
 
-const fetchVAPCompliance = async (organizationId, months = 6) => {
+const fetchVAPCompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const monthsArray = []
     for (let i = months - 1; i >= 0; i--) {
@@ -222,7 +279,7 @@ const fetchVAPCompliance = async (organizationId, months = 6) => {
       monthsArray.push(date.toLocaleDateString('en-US', { month: 'long' }))
     }
 
-    // Since we don't have bundle-specific data, we'll create a single row for VAP compliance
+    // For now, create a single row for overall VAP compliance
     const results = []
     const row = { bundle: 'VAP Bundle' }
     
@@ -238,7 +295,7 @@ const fetchVAPCompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
@@ -246,9 +303,15 @@ const fetchVAPCompliance = async (organizationId, months = 6) => {
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
 
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
+
       if (error) {
         console.error('Error fetching VAP data:', error)
-        return { data: [], months: [] }
+        row[month] = 'N/A'
+        continue
       }
 
       const monthlyData = data || []
@@ -267,7 +330,7 @@ const fetchVAPCompliance = async (organizationId, months = 6) => {
   }
 }
 
-const fetchNIVCompliance = async (organizationId, months = 6) => {
+const fetchNIVCompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const results = []
     for (let i = months - 1; i >= 0; i--) {
@@ -282,13 +345,18 @@ const fetchNIVCompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
         .eq('audit_type', 'niv')
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
+
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching NIV data:', error)
@@ -313,7 +381,7 @@ const fetchNIVCompliance = async (organizationId, months = 6) => {
   }
 }
 
-const fetchCLABSICompliance = async (organizationId, months = 6) => {
+const fetchCLABSICompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const results = []
     for (let i = months - 1; i >= 0; i--) {
@@ -328,13 +396,18 @@ const fetchCLABSICompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
         .eq('audit_type', 'clabsi')
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
+
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching CLABSI data:', error)
@@ -359,7 +432,7 @@ const fetchCLABSICompliance = async (organizationId, months = 6) => {
   }
 }
 
-const fetchDisinfectionCompliance = async (organizationId, months = 6) => {
+const fetchDisinfectionCompliance = async (organizationId, months = 6, filters = {}) => {
   try {
     const results = []
     for (let i = months - 1; i >= 0; i--) {
@@ -374,13 +447,18 @@ const fetchDisinfectionCompliance = async (organizationId, months = 6) => {
       const startDateStr = formatDateForQuery(startDate)
       const endDateStr = formatEndDateForQuery(endDate)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_records')
         .select('compliance_score')
         .eq('organization_id', organizationId)
         .eq('audit_type', 'disinfection')
         .gte('created_at', startDateStr)
         .lte('created_at', endDateStr)
+
+      // Apply hierarchy filters using helper function
+      query = await applyHierarchyFilters(query, filters)
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching disinfection data:', error)

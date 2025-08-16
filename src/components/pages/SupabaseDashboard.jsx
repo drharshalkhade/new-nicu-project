@@ -1,6 +1,7 @@
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom'
 import { Activity, Users, TrendingUp, AlertTriangle, Plus, RefreshCw, Calendar } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { useRoleBasedAccess } from '../../hooks/useRoleBasedAccess'
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits'
 import { useDashboardData } from '../../hooks/useDashboardData'
@@ -10,12 +11,21 @@ import HandHygieneComplianceTable from '../Dashboard/HandHygieneComplianceTable'
 import HandWashComplianceTable from '../Dashboard/HandWashComplianceTable'
 import VAPComplianceTable from '../Dashboard/VAPComplianceTable'
 import NIVComplianceTable from '../Dashboard/NIVComplianceTable'
+import HierarchyFilter from '../Dashboard/HierarchyFilter'
 
 const SupabaseDashboard = () => {
+  const dispatch = useDispatch();
   const userDetails = useSelector(state => state.user.userDetails);
   const { hasPermission } = useRoleBasedAccess();
   const { loading: overallLoading, error, getComplianceStats, getAuditsByType } = useSupabaseAudits();
   const { loading: dashboardLoading, refetch } = useDashboardData();
+  const [hierarchyFilters, setHierarchyFilters] = useState({});
+
+  const handleFilterChange = (filters) => {
+    setHierarchyFilters(filters);
+    // Trigger dashboard data refresh with new filters
+    refetch(filters);
+  };
 
   if (overallLoading || dashboardLoading) {
     return (
@@ -68,7 +78,7 @@ const SupabaseDashboard = () => {
                 SUPER ADMIN
               </span>
             )}
-            {userDetails?.role === 'admin' && (
+            {userDetails?.role === 'hospital_admin' && (
               <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
                 ADMIN
               </span>
@@ -97,6 +107,9 @@ const SupabaseDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Hierarchy Filter for Super Admins */}
+      <HierarchyFilter onFilterChange={handleFilterChange} />
 
       {/* Subscription Alerts */}
       {userDetails?.subscription_status === 'trial' && (
