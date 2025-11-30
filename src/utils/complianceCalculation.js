@@ -205,8 +205,8 @@ function calculateCLABSICompliance(auditData) {
 
 function calculateNIVCompliance(auditData) {
   const common = [
-    'appropriateSize','skinBarrier','gapNasalSeptum','skinBlanched','nasalTrauma',
-    'prongsSecured','tractionInterface','circuitSecured','gentleMassage','humidification'
+    'appropriateSize', 'skinBarrier', 'gapNasalSeptum', 'skinBlanched', 'nasalTrauma',
+    'prongsSecured', 'tractionInterface', 'circuitSecured', 'gentleMassage', 'humidification'
   ];
   let specific = [];
   const type = auditData.respiratorySupport;
@@ -254,24 +254,24 @@ function calculateVAPCompliance(auditData) {
   switch (bundleType) {
     case 'Intubation Bundle':
       fields = [
-        'preSupplies','preETSize','preETDepth','procMask',
-        'procHandWash','procAseptic','procSteps','procHandRubAfter'
+        'preSupplies', 'preETSize', 'preETDepth', 'procMask',
+        'procHandWash', 'procAseptic', 'procSteps', 'procHandRubAfter'
       ]; total = 8; break;
     case 'Maintenance Bundle':
       fields = [
-        'humidHeated','humidGasTemp','humidAutoRefill','humidSterileWater','humidCondensation','humidDrain','equipCircuits',
-        'equipClean','equipHandHygiene','equipPosition','infantHeadElevation','infantPositionChange','oralSuction','oralColostrum','ogFeeds','extubSedation','extubReadiness'
+        'humidHeated', 'humidGasTemp', 'humidAutoRefill', 'humidSterileWater', 'humidCondensation', 'humidDrain', 'equipCircuits',
+        'equipClean', 'equipHandHygiene', 'equipPosition', 'infantHeadElevation', 'infantPositionChange', 'oralSuction', 'oralColostrum', 'ogFeeds', 'extubSedation', 'extubReadiness'
       ]; total = 17; break;
     case 'ET Suction Bundle':
       fields = [
-        'etSuctionClinical','etSuctionHandHygiene','etSuctionSterile','etSuctionCatheter','etSuctionProtected','etSuctionAseptic','etSuctionSaline','etSuctionOralNasal','etSuctionDisposal'
+        'etSuctionClinical', 'etSuctionHandHygiene', 'etSuctionSterile', 'etSuctionCatheter', 'etSuctionProtected', 'etSuctionAseptic', 'etSuctionSaline', 'etSuctionOralNasal', 'etSuctionDisposal'
       ]; total = 9; break;
     case 'Extubation Bundle':
       fields = [
-        'extubReason','extubVentilatorSettings','extubDrugs','extubStability','extubBreathingTrial','extubTwoPeople','extubSupplies','extubSteps','extubRespiratory'
+        'extubReason', 'extubVentilatorSettings', 'extubDrugs', 'extubStability', 'extubBreathingTrial', 'extubTwoPeople', 'extubSupplies', 'extubSteps', 'extubRespiratory'
       ]; total = 9; break;
     case 'Post-Extubation Care Bundle':
-      fields = ['postExtubRespiratory','postExtubNebulization','postExtubPosition','postExtubSuction','postExtubMonitoring'];
+      fields = ['postExtubRespiratory', 'postExtubNebulization', 'postExtubPosition', 'postExtubSuction', 'postExtubMonitoring'];
       total = 5; break;
     default:
       return { score: 0, totalFields: 0, completedFields: 0, details: {} };
@@ -325,7 +325,7 @@ function calculateDisinfectionCompliance(auditData) {
       fields = ['laryngoscope', 'ventilatorCircuit', 'ambuBag', 'oxygenJars'];
       frequency = 'after_use'; break;
     case 'weeklyTasks':
-      fields = ['fridge','cpapVentilators','warmers','incubators'];
+      fields = ['fridge', 'cpapVentilators', 'warmers', 'incubators'];
       frequency = 'weekly'; break;
     default:
       return { score: 0, totalFields: 0, completedFields: 0, details: {} };

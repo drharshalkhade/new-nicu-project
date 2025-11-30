@@ -144,7 +144,7 @@ const SupaBaseNavbar = () => {
 
   return (
     <Header className="bg-blue-800 border-b border-blue-700 shadow-sm sticky top-0 z-50 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between overflow-hidden">
-      
+
       {/* Logo Section - Fixed width */}
       <div className="flex-shrink-0">
         <Link to="/dashboard" className="flex items-center gap-2">
@@ -191,10 +191,10 @@ const SupaBaseNavbar = () => {
                 backgroundColor: userDetails?.role === 'super_admin'
                   ? '#dc2626'
                   : userDetails?.role === 'hospital_admin'
-                  ? '#2563eb'
-                  : userDetails?.role === 'auditor'
-                  ? '#16a34a'
-                  : '#6b7280'
+                    ? '#2563eb'
+                    : userDetails?.role === 'auditor'
+                      ? '#16a34a'
+                      : '#6b7280'
               }}
             >
               {userDetails?.name?.charAt(0).toUpperCase()}

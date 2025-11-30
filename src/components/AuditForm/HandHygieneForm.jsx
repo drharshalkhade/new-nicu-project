@@ -2,48 +2,43 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Save,
-  AlertCircle,
   CheckCircle,
   X,
   ArrowLeft,
+  Scan,
+  Users,
+  Activity,
+  ShieldAlert,
+  LayoutDashboard,
+  Trash2
 } from 'lucide-react';
 import {
   Form,
   Input,
   Select,
-  Radio,
   Button,
   message,
-  Checkbox,
+  Card,
+  Tag,
+  Divider
 } from 'antd';
 import { useSelector, useDispatch } from 'react-redux';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { calculateHandHygieneCompliance } from '../../utils/complianceCalculation';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-
+import SelectionCard from '../common-components/SelectionCard';
+import {
+  hcpOptions,
+  opportunityTypes,
+  adherenceStepsOptions,
+  handRubDurationOptions,
+  glovesRequiredForOptions,
+  yesNoOptions
+} from '../../constant/audit-options';
 
 const { TextArea } = Input;
 const { Option } = Select;
-
-const hcpOptions = ['Doctor', 'Nurse', 'Housekeeping', 'Radiology', 'Others'];
-const opportunityTypes = [
-  'Moment 1 - Before touching patients',
-  'Moment 2 - Before Clean Procedure',
-  'Moment 3 - After risk of body fluid exposure',
-  'Moment 4 - After touching the Patients',
-  'Moment 5 - After touching surroundings',
-];
-const adherenceStepsOptions = ['Less than 3', '3 to 5 steps', '6 Steps', '0 Steps'];
-const handRubDurationOptions = ['<10 sec', '10-20 sec', '>20 sec', '0 sec'];
-const glovesRequiredForOptions = [
-  'Intubation',
-  'IV line insertion',
-  'Central line insertion',
-  'Central line Maintenance',
-  'Drug administration',
-  'Other',
-];
 
 const HandHygieneForm = () => {
   const navigate = useNavigate();
@@ -57,6 +52,9 @@ const HandHygieneForm = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [form] = Form.useForm();
+  const watchedNicuArea = Form.useWatch('nicuArea', form);
+  const watchedHcp = Form.useWatch('hcp', form);
+  const watchedOpportunityType = Form.useWatch('opportunityType', form);
 
   useEffect(() => {
     if (profile?.organization_id && nicuAreas.length === 0 && !loadingAreas) {
@@ -64,18 +62,8 @@ const HandHygieneForm = () => {
     }
   }, [profile?.organization_id]);
 
-  const calculateCompliance = (values) => {
-    try {
-      const result = calculateHandHygieneCompliance(values);
-      return result;
-    } catch (e) {
-      return { score: 0, e };
-    }
-  };
-
   const onFinish = async (values) => {
     try {
-      // Add observerId/Name and compliance calculation
       const moments = {
         beforePatientContact: values.opportunityType?.includes('Moment 1 - Before touching patients') || false,
         beforeAsepticProcedure: values.opportunityType?.includes('Moment 2 - Before Clean Procedure') || false,
@@ -95,8 +83,8 @@ const HandHygieneForm = () => {
         notes: values.comments || undefined,
         patientName: values.patientName,
         bedsideStaffName: values.bedsideStaffName,
-        adherenceSteps: values.adherenceSteps ? values.adherenceSteps.join(', ') : '',
-        handRubDuration: values.handRubDuration ? values.handRubDuration.join(', ') : '',
+        adherenceSteps: values.adherenceSteps || '',
+        handRubDuration: values.handRubDuration || '',
         glovesRequired: values.glovesRequired,
         glovesRequiredFor: values.glovesRequiredFor ? values.glovesRequiredFor.join(', ') : '',
         glovesUsed: values.glovesUsed,
@@ -133,257 +121,294 @@ const HandHygieneForm = () => {
 
   if (showSuccess) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-900 mb-2">Audit Submitted Successfully!</h2>
-          <p className="text-green-700">Your hand hygiene audit has been recorded. Redirecting to dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-lg w-full">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Audit Submitted!</h2>
+          <p className="text-gray-500 mb-8">Your hand hygiene audit has been successfully recorded.</p>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2 overflow-hidden">
+            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+          </div>
+          <p className="text-xs text-gray-400">Redirecting to dashboard...</p>
         </div>
       </div>
     );
   }
 
-  const complianceDetails = calculateCompliance(form.getFieldsValue());
-  const isLowCompliance = complianceDetails.score / 100 < 0.8;
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700">
-          <div className="flex items-center space-x-4">
-            <Button
-              type="text"
-              onClick={() => navigate('/audit')}
-              icon={<ArrowLeft className="h-6 w-6 text-blue-100" />}
-              className="text-blue-100 hover:text-white transition-colors"
-            />
-            <div>
-              <h1 className="text-2xl font-bold text-white">Hand Hygiene Compliance Audit Form</h1>
-              <p className="text-blue-100 mt-1">2025 - Based on WHO's 5 Moments for Hand Hygiene</p>
+    <div className="min-h-screen bg-gray-50/50 pb-12">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-[30px] z-10 shadow-sm">
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between h-fit">
+            <div className="flex items-center gap-4">
+              <Button
+                type="text"
+                shape="circle"
+                icon={<ArrowLeft size={20} />}
+                onClick={() => navigate('/audit')}
+                className="hover:bg-gray-100"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Hand Hygiene Audit</h1>
+                <p className="text-xs text-gray-500">WHO 5 Moments Protocol</p>
+              </div>
             </div>
+            <Tag color="blue" className="px-3 py-1 rounded-full">
+              {new Date().toLocaleDateString()}
+            </Tag>
           </div>
         </div>
+      </div>
 
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Form
           form={form}
           layout="vertical"
           onFinish={onFinish}
-          className="p-6 space-y-8"
+          className="space-y-8"
           initialValues={{
             hcp: [],
             opportunityType: [],
-            adherenceSteps: [],
-            handRubDuration: [],
+            adherenceSteps: null,
+            handRubDuration: null,
             glovesRequiredFor: [],
           }}
         >
-          {/* Basic Info Section */}
-          <div className="bg-gray-50 p-6 rounded-lg">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+          {/* Section 1: Context */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl overflow-hidden" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <LayoutDashboard className="text-blue-600" size={20} />
+                Audit Context
+              </h3>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Form.Item label="Patient Name" name="patientName">
-                <Input placeholder="Enter patient name" />
-              </Form.Item>
-              <Form.Item label="Bedside Staff Name" name="bedsideStaffName">
-                <Input placeholder="Enter staff name" />
-              </Form.Item>
               <Form.Item
                 label="NICU Area"
                 name="nicuArea"
-                rules={[{ required: true, message: 'Please select an NICU area' }]}
+                rules={[{ required: true, message: 'Required' }]}
               >
                 <Select
-                  showSearch
-                  placeholder="Select NICU Area"
+                  size="large"
+                  placeholder="Select Area"
                   loading={loadingAreas}
-                  allowClear
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    option?.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                  }
                   onChange={value => form.setFieldsValue({ nicuAreaId: value })}
+                  className="w-full"
                 >
                   {nicuAreas.map((area) => (
-                    <Option key={area.id} value={area.name}>
-                      {area.name}
-                    </Option>
+                    <Option key={area.id} value={area.name}>{area.name}</Option>
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item
-                label="NICU Area Id"
-                name="nicuAreaId"
-                rules={[{ required: true, message: 'NICU Area ID is required' }]}
-                hidden
-              >
-                <Input disabled />
+
+              <Form.Item name="nicuAreaId" hidden><Input /></Form.Item>
+
+              <Form.Item label="Patient Name (Optional)" name="patientName">
+                <Input size="large" placeholder="Patient Identifier" />
+              </Form.Item>
+
+              <Form.Item label="Staff Name (Optional)" name="bedsideStaffName">
+                <Input size="large" placeholder="Staff Name" />
               </Form.Item>
             </div>
-          </div>
+          </Card>
 
-          {/* Healthcare Provider Type */}
-          <Form.Item
-            label="Healthcare Provider (HCP)*"
-            name="hcp"
-            rules={[{ required: true, message: 'Please select at least one healthcare provider' }]}
-          >
-            <Checkbox.Group>
-              {hcpOptions.map(option => (
-                <Checkbox key={option} value={option}>
-                  {option}
-                </Checkbox>
-              ))}
-            </Checkbox.Group>
-          </Form.Item>
-
-          {/* WHO 5 Moments */}
-          <Form.Item
-            label="Type of Opportunity*"
-            name="opportunityType"
-            rules={[{ required: true, message: 'Please select at least one moment' }]}
-          >
-            <Checkbox.Group>
-              {opportunityTypes.map(option => (
-                <Checkbox key={option} value={option}>
-                  {option}
-                </Checkbox>
-              ))}
-            </Checkbox.Group>
-          </Form.Item>
-
-          {/* Technique Assessment */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Form.Item
-              label="Adherence to Technique: Number of Steps*"
-              name="adherenceSteps"
-              rules={[{ required: true, message: 'Please select your adherence steps' }]}
-            >
-              <Radio.Group className="flex space-x-8">
-                {adherenceStepsOptions.map(option => (
-                  <Radio key={option} value={option}>
-                    {option}
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-            <Form.Item
-              label="Time Duration of Hand Rub*"
-              name="handRubDuration"
-              rules={[{ required: true, message: 'Please select hand rub duration' }]}
-            >
-              <Radio.Group className="flex space-x-8">
-                {handRubDurationOptions.map(option => (
-                  <Radio key={option} value={option}>
-                    {option}
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-          </div>
-
-          {/* Gloves Assessment */}
-          <div className="bg-purple-50 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-purple-900 mb-4">Gloves Assessment</h3>
-            <Form.Item
-              label="Gloves Required?"
-              name="glovesRequired"
-              rules={[{ required: true, message: 'Please select an option' }]}
-            >
-              <Radio.Group className="flex space-x-8">
-                {['Yes', 'No'].map(option => (
-                  <Radio key={option} value={option}>
-                    {option}
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-            <Form.Item
-              label="Gloves Required For"
-              name="glovesRequiredFor"
-            >
-              <Checkbox.Group>
-                {glovesRequiredForOptions.map(option => (
-                  <Checkbox key={option} value={option}>
-                    {option}
-                  </Checkbox>
-                ))}
-              </Checkbox.Group>
-            </Form.Item>
-            <Form.Item
-              label="Gloves Used"
-              name="glovesUsed"
-              rules={[{ required: true, message: 'Please select an option' }]}
-            >
-              <Radio.Group className="flex space-x-8">
-                {['Yes', 'No'].map(option => (
-                  <Radio key={option} value={option}>
-                    {option}
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-            <Form.Item
-              label="Notified Bedside*"
-              name="notifiedBedside"
-              rules={[{ required: true, message: 'Please select an option' }]}
-            >
-              <Radio.Group className="flex space-x-8">
-                {['Yes', 'No'].map(option => (
-                  <Radio key={option} value={option}>
-                    {option}
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-          </div>
-
-
-
-          {/* Comments */}
-          <Form.Item label="Any Comments" name="comments">
-            <TextArea rows={4} placeholder="Enter any additional observations or comments..." />
-          </Form.Item>
-
-          {/* Image Upload */}
-          <Form.Item label="Upload Image if any*">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={onImageChange}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-            {imagePreview && (
-              <div className="relative mt-3 w-48 h-32 rounded-md overflow-hidden border border-gray-200">
-                <img src={imagePreview} alt="Preview" className="object-cover w-full h-full" />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1"
-                  aria-label="Remove image"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </Form.Item>
-
-          {/* Submit Buttons */}
-          <Form.Item>
-            <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-              <Button onClick={() => navigate('/audit')}>
-                Cancel
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-              >
-                <Save className="mr-2" />
-                Submit
-              </Button>
+          {/* Section 2: Healthcare Provider */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Users className="text-blue-600" size={20} />
+                Healthcare Provider <span className="text-red-500">*</span>
+              </h3>
             </div>
-          </Form.Item>
+            <Form.Item
+              name="hcp"
+              rules={[{ required: true, message: 'Select at least one provider' }]}
+            >
+              <SelectionCard options={hcpOptions} multi={true} cols={3} />
+            </Form.Item>
+          </Card>
+
+          {/* Section 3: Moments */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Activity className="text-blue-600" size={20} />
+                WHO 5 Moments <span className="text-red-500">*</span>
+              </h3>
+            </div>
+            <Form.Item
+              name="opportunityType"
+              rules={[{ required: true, message: 'Select at least one moment' }]}
+            >
+              <SelectionCard options={opportunityTypes} multi={true} cols={2} />
+            </Form.Item>
+          </Card>
+
+          {/* Section 4: Technique */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <CheckCircle className="text-blue-600" size={20} />
+                Technique Assessment
+              </h3>
+            </div>
+
+            <div className="space-y-6">
+              <Form.Item
+                label="Adherence to Steps"
+                name="adherenceSteps"
+                rules={[{ required: true, message: 'Required' }]}
+              >
+                <SelectionCard options={adherenceStepsOptions} multi={false} cols={4} />
+              </Form.Item>
+
+              <Divider dashed />
+
+              <Form.Item
+                label="Duration of Hand Rub"
+                name="handRubDuration"
+                rules={[{ required: true, message: 'Required' }]}
+              >
+                <SelectionCard options={handRubDurationOptions} multi={false} cols={4} />
+              </Form.Item>
+            </div>
+          </Card>
+
+          {/* Section 5: Gloves */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl bg-gradient-to-br from-purple-50 to-white" bordered={false}>
+            <div className="border-b border-purple-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-purple-900 flex items-center gap-2">
+                <ShieldAlert className="text-purple-600" size={20} />
+                Gloves & Safety
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <Form.Item
+                  label="Gloves Required?"
+                  name="glovesRequired"
+                  rules={[{ required: true, message: 'Required' }]}
+                >
+                  <SelectionCard
+                    cols={2}
+                    options={yesNoOptions}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Gloves Used?"
+                  name="glovesUsed"
+                  rules={[{ required: true, message: 'Required' }]}
+                >
+                  <SelectionCard
+                    cols={2}
+                    options={yesNoOptions}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Notified Bedside?"
+                  name="notifiedBedside"
+                  rules={[{ required: true, message: 'Required' }]}
+                >
+                  <SelectionCard
+                    cols={2}
+                    options={yesNoOptions}
+                  />
+                </Form.Item>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-purple-100">
+                <Form.Item
+                  label="Gloves Required For"
+                  name="glovesRequiredFor"
+                >
+                  <SelectionCard options={glovesRequiredForOptions} multi={true} cols={1} />
+                </Form.Item>
+              </div>
+            </div>
+          </Card>
+
+          {/* Section 6: Evidence */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Save className="text-blue-600" size={20} />
+                Evidence & Notes
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Form.Item label="Comments" name="comments">
+                <TextArea
+                  rows={4}
+                  placeholder="Add any additional context..."
+                  className="rounded-xl resize-none"
+                />
+              </Form.Item>
+
+              <Form.Item label="Photo Evidence">
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onImageChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {imagePreview ? (
+                    <div className="relative h-40 mx-auto rounded-lg overflow-hidden shadow-sm">
+                      <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          removeImage();
+                        }}
+                        className="absolute top-2 right-2 bg-white/90 text-red-500 p-1.5 rounded-full hover:bg-red-50"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <div className="bg-blue-50 p-3 rounded-full mb-3">
+                        <Scan className="text-blue-500" size={24} />
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">Click to upload</p>
+                      <p className="text-xs text-gray-500">SVG, PNG, JPG</p>
+                    </div>
+                  )}
+                </div>
+              </Form.Item>
+            </div>
+          </Card>
+
+          {/* Footer Actions */}
+          <div className="flex items-center justify-end gap-4 pt-4 pb-20">
+            <Button
+              size="large"
+              onClick={() => navigate('/audit')}
+              className="px-8 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              size="large"
+              icon={<Save size={18} />}
+              disabled={!watchedNicuArea || !watchedHcp?.length || !watchedOpportunityType?.length}
+              className="px-8 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200"
+            >
+              Submit Audit
+            </Button>
+          </div>
         </Form>
       </div>
     </div>

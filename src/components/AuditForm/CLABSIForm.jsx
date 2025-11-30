@@ -5,12 +5,27 @@ import {
   AlertCircle,
   CheckCircle,
   ArrowLeft,
+  LayoutDashboard,
+  Syringe,
+  Activity,
+  Trash2,
+  Calendar,
+  FileText
 } from 'lucide-react';
-import { Form, Input, Select, Radio, Button, message, Spin } from 'antd';
+import { Form, Input, Select, Button, message, Spin, Card, Tag } from 'antd';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { useSelector, useDispatch } from 'react-redux';
-
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
+import SelectionCard from '../common-components/SelectionCard';
+import {
+  clabsiBundleOptions,
+  catheterTypes,
+  catheterSites,
+  sides,
+  limbs,
+  yesNoOptions,
+  removalReasons
+} from '../../constant/audit-options';
 
 const { Option } = Select;
 
@@ -64,662 +79,288 @@ const CLABSIForm = () => {
     }
   };
 
-  const formValues = form.getFieldsValue();
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center space-x-4">
-            <Button
-              type="text"
-              onClick={() => navigate('/audit')}
-              icon={<ArrowLeft className="h-5 w-5" />}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <span>Back</span>
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">CLABSI Checklist</h1>
-              <p className="text-gray-600 mt-1">
-                Central Line-Associated Bloodstream Infection Prevention
-              </p>
+    <div className="min-h-screen bg-gray-50/50 pb-12">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-[30px] z-10 shadow-sm">
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between h-fit">
+            <div className="flex items-center gap-4">
+              <Button
+                type="text"
+                shape="circle"
+                icon={<ArrowLeft size={20} />}
+                onClick={() => navigate('/audit')}
+                className="hover:bg-gray-100"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">CLABSI Checklist</h1>
+                <p className="text-xs text-gray-500">Central Line-Associated Bloodstream Infection Prevention</p>
+              </div>
             </div>
+            <Tag color="purple" className="px-3 py-1 rounded-full">
+              {new Date().toLocaleDateString()}
+            </Tag>
           </div>
         </div>
+      </div>
 
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Form
           form={form}
           onFinish={onFinish}
           layout="vertical"
-          className="p-6 space-y-6"
+          className="space-y-8"
           initialValues={{
             bundleChecklist: '',
           }}
         >
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <Form.Item
-              label="Patient Name *"
-              name="patientName"
-              rules={[{ required: true, message: 'Please enter patient name' }]}
-            >
-              <Input placeholder="Enter patient name" />
-            </Form.Item>
+          {/* Section 1: Context */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl overflow-hidden" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <LayoutDashboard className="text-purple-600" size={20} />
+                Audit Context
+              </h3>
+            </div>
 
-            <Form.Item label="Staff Name" name="staffName">
-              <Input placeholder="Enter staff name" />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Form.Item
+                label="NICU Area"
+                name="nicuArea"
+                rules={[{ required: true, message: 'Required' }]}
+              >
+                {loadingAreas ? (
+                  <Spin />
+                ) : (
+                  <Select
+                    size="large"
+                    placeholder="Select Area"
+                    allowClear
+                    onChange={(value, option) => {
+                      const selectedArea = nicuAreas.find(area => area.name === value);
+                      if (selectedArea) {
+                        form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                      }
+                    }}
+                  >
+                    {nicuAreas.map(area => (
+                      <Option key={area.id} value={area.name}>{area.name}</Option>
+                    ))}
+                  </Select>
+                )}
+              </Form.Item>
+              <Form.Item name="nicuAreaId" hidden><Input /></Form.Item>
 
-            <Form.Item
-              label="NICU Area *"
-              name="nicuArea"
-              rules={[{ required: true, message: 'Please select NICU area' }]}
-            >
-              {loadingAreas ? (
-                <Spin />
-              ) : (
-                <Select 
-                  placeholder="Select NICU Area" 
-                  allowClear
-                  onChange={(value, option) => {
-                    const selectedArea = nicuAreas.find(area => area.name === value);
-                    if (selectedArea) {
-                      form.setFieldsValue({ nicuAreaId: selectedArea.id });
-                    }
-                  }}
-                >
-                  {nicuAreas.map(area => (
-                    <Option key={area.id} value={area.name}>
-                      {area.name}
-                    </Option>
-                  ))}
-                </Select>
-              )}
-            </Form.Item>
-            <Form.Item
-              label="NICU Area Id"
-              name="nicuAreaId"
-              rules={[{ required: true, message: 'NICU Area ID is required' }]}
-              hidden
-            >
-              <Input disabled />
-            </Form.Item>
-          </div>
+              <Form.Item label="Patient Name" name="patientName" rules={[{ required: true, message: 'Required' }]}>
+                <Input size="large" placeholder="Patient Name" />
+              </Form.Item>
 
-          {/* Bundle Selection */}
-          <div className="bg-purple-100 p-4 rounded-md">
+              <Form.Item label="Staff Name" name="staffName">
+                <Input size="large" placeholder="Staff Name" />
+              </Form.Item>
+            </div>
+          </Card>
+
+          {/* Section 2: Bundle Selection */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <FileText className="text-purple-600" size={20} />
+                Bundle Selection
+              </h3>
+            </div>
             <Form.Item
-              label="Bundle Checklist *"
               name="bundleChecklist"
-              rules={[{ required: true, message: 'Please select a bundle checklist' }]}
+              rules={[{ required: true, message: 'Please select a bundle' }]}
             >
-              <Radio.Group onChange={(e) => onBundleChange(e.target.value)}>
-                {['Insertion Bundle', 'Maintenance Bundle', 'Removal Bundle'].map(bundle => (
-                  <Radio key={bundle} value={bundle}>
-                    {bundle}
-                  </Radio>
-                ))}
-              </Radio.Group>
+              <SelectionCard
+                options={clabsiBundleOptions}
+                cols={3}
+                onChange={onBundleChange}
+              />
             </Form.Item>
-          </div>
+          </Card>
 
           {/* Insertion Bundle */}
           {selectedBundle === 'Insertion Bundle' && (
-            <div className="bg-purple-100 p-4 rounded-md">
-              <h2 className="text-xl font-semibold mb-4">Insertion Bundle</h2>
-            
-            <div className="space-y-4">
-              <Form.Item
-                label="Indication *"
-                name="indication"
-                rules={[{ required: true, message: 'Please enter indication' }]}
-              >
-                <Input placeholder="Enter indication" />
-              </Form.Item>
-              
-              <Form.Item
-                label="Elective/Emergency *"
-                name="electiveEmergency"
-                rules={[{ required: true, message: 'Please select type' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Elective', 'Emergency'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Syringe className="text-purple-600" size={20} />
+                  Insertion Bundle
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Form.Item label="Indication" name="indication" rules={[{ required: true }]}>
+                  <Input size="large" placeholder="Indication" />
+                </Form.Item>
+
+                <Form.Item label="Type" name="electiveEmergency" rules={[{ required: true }]}>
+                  <SelectionCard
+                    cols={2}
+                    options={[
+                      { value: 'Elective', label: 'Elective', icon: <Calendar size={18} /> },
+                      { value: 'Emergency', label: 'Emergency', icon: <AlertCircle size={18} /> }
+                    ]}
+                  />
+                </Form.Item>
+
+                <Form.Item label="Supplies Arranged" name="suppliesArranged" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+
+                <Form.Item label="Catheter Type" name="catheterTypes" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={catheterTypes} />
+                </Form.Item>
+
+                <Form.Item label="Site" name="site" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={catheterSites} />
+                </Form.Item>
+
+                <Form.Item label="Side" name="side" rules={[{ required: true }]}>
+                  <SelectionCard cols={3} options={sides} />
+                </Form.Item>
+
+                <Form.Item label="Limb" name="limb" rules={[{ required: true }]}>
+                  <SelectionCard cols={3} options={limbs} />
+                </Form.Item>
+
+                <Form.Item label="2 People Involved" name="twoPeople" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+
+                <Form.Item label="Measurement Done" name="measurementDone" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+              </div>
+
+              <div className="mt-8 mb-4">
+                <h4 className="text-md font-semibold text-gray-700 mb-4">During Procedure</h4>
+                <div className="grid grid-cols-1 gap-6">
+                  {[
+                    { label: "Wash hands & Hand Rub", name: "washHandsDuring" },
+                    { label: "PPE and strict asepsis", name: "ppeAsepsis" },
+                    { label: "Check Equipment / Sterile Tray", name: "checkEquipment" },
+                    { label: "All Lumens Flushed", name: "allLumensFlushed" },
+                    { label: "Appropriate Site preparation", name: "sitePreparation" },
+                    { label: "Strict aseptic precautions", name: "asepticPrecautions" },
+                    { label: "Appropriate steps followed", name: "appropriateSteps" },
+                    { label: "Number of Pricks <= 2", name: "numberOfPricks" },
+                    { label: "Haemostasis Achieved", name: "haemostasisAchieved" },
+                    { label: "Fixed with sterile Pad", name: "fixedWithPad" },
+                    { label: "Needle free connector used", name: "needleFreeConnector" },
+                    { label: "Handwash after removing gloves", name: "handwashAfterGloves" },
+                    { label: "Ultrasound Guidance Used", name: "ultrasoundGuidance" },
+                  ].map(field => (
+                    <Form.Item key={field.name} label={field.label} name={field.name} rules={[{ required: true }]}>
+                      <SelectionCard cols={2} options={yesNoOptions} />
+                    </Form.Item>
                   ))}
-                </Radio.Group>
-              </Form.Item>
+                </div>
+              </div>
 
-              <Form.Item
-                label="Supplies/Equipment arranged *"
-                name="suppliesArranged"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+              <div className="mt-8 mb-4">
+                <h4 className="text-md font-semibold text-gray-700 mb-4">After Procedure</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Form.Item label="Position Confirm on CXR" name="positionConfirm" rules={[{ required: true }]}>
+                    <SelectionCard
+                      cols={3}
+                      options={[
+                        { value: 'USG', label: 'USG', icon: <Activity size={18} /> },
+                        { value: 'CXR', label: 'CXR', icon: <Activity size={18} /> },
+                        { value: 'Unconfirmed', label: 'Unconfirmed', icon: <AlertCircle size={18} /> }
+                      ]}
+                    />
+                  </Form.Item>
 
-              <Form.Item
-                label="Catheter types *"
-                name="catheterTypes"
-                rules={[{ required: true, message: 'Please select catheter type' }]}
-              >
-                <Radio.Group>
-                  {['CVC', 'PICC', 'Umbilical catheter', 'Feeding Tube'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+                  <Form.Item label="Repositioning Required" name="repositioningRequired" rules={[{ required: true }]}>
+                    <SelectionCard cols={2} options={yesNoOptions} />
+                  </Form.Item>
 
-              <Form.Item
-                label="Site *"
-                name="site"
-                rules={[{ required: true, message: 'Please select site' }]}
-              >
-                <Radio.Group>
-                  {['Umbilical', 'Peripheral', 'Femoral', 'IJV', 'Subclavian'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+                  <Form.Item label="Fixed at (cm)" name="fixedAt" rules={[{ required: true }]}>
+                    <Input size="large" type="number" placeholder="Depth in cm" />
+                  </Form.Item>
 
-              <Form.Item
-                label="Side *"
-                name="side"
-                rules={[{ required: true, message: 'Please select side' }]}
-              >
-                <Radio.Group>
-                  {['Right', 'Left', 'NA'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Limb *"
-                name="limb"
-                rules={[{ required: true, message: 'Please select limb' }]}
-              >
-                <Radio.Group>
-                  {['Upper', 'Lower', 'NA'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="2 People involved *"
-                name="twoPeople"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Measurement done *"
-                name="measurementDone"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <h3 className="text-lg font-medium mt-4">During Procedure</h3>
-
-              <Form.Item
-                label="Wash hands with soap and water f/b Hand Rub (As per policy) *"
-                name="washHandsDuring"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="PPE and strict asepsis (Cap, Mask, Gloves, Gown, Drape) *"
-                name="ppeAsepsis"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Check Equipment / Sterile Tray *"
-                name="checkEquipment"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="All Lumens Flushed *"
-                name="allLumensFlushed"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Appropriate Site preparation *"
-                name="sitePreparation"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Strict aseptic precautions *"
-                name="asepticPrecautions"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Appropriate steps followed *"
-                name="appropriateSteps"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Number of Pricks < or = 2 *"
-                name="numberOfPricks"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Haemostasis Achieved *"
-                name="haemostasisAchieved"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Fixed with sterile Pad *"
-                name="fixedWithPad"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Needle free connector used *"
-                name="needleFreeConnector"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Handwash or hand rub after removing gloves *"
-                name="handwashAfterGloves"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Ultrasound Guidance Used *"
-                name="ultrasoundGuidance"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <h3 className="text-lg font-medium mt-4">After Procedure</h3>
-
-              <Form.Item
-                label="Position Confirm on CXR *"
-                name="positionConfirm"
-                rules={[{ required: true, message: 'Please select position confirmation' }]}
-              >
-                <Radio.Group>
-                  {['USG', 'CXR', 'Unconfirmed'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Repositioning Required *"
-                name="repositioningRequired"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Fixed at ____ cm *"
-                name="fixedAt"
-                rules={[{ required: true, message: 'Please enter depth' }]}
-              >
-                <Input placeholder="Enter depth in cm" />
-              </Form.Item>
-
-              <Form.Item
-                label="Date/ Time of insertion *"
-                name="dateTimeInsertion"
-                rules={[{ required: true, message: 'Please enter date and time' }]}
-              >
-                <Input type="date" />
-              </Form.Item>
-            </div>
-          </div>
+                  <Form.Item label="Date/Time of Insertion" name="dateTimeInsertion" rules={[{ required: true }]}>
+                    <Input size="large" type="datetime-local" />
+                  </Form.Item>
+                </div>
+              </div>
+            </Card>
           )}
 
           {/* Maintenance Bundle */}
           {selectedBundle === 'Maintenance Bundle' && (
-            <div className="bg-purple-100 p-4 rounded-md">
-              <h2 className="text-xl font-semibold mb-4">Maintenance Bundle</h2>
-            
-            <div className="space-y-4">
-              <Form.Item
-                label="Wash hands with soap and water f/b Hand Rub (As per policy) *"
-                name="washHandsMaintenance"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Activity className="text-purple-600" size={20} />
+                  Maintenance Bundle
+                </h3>
+              </div>
 
-              <Form.Item
-                label="Assessed the need of central lines *"
-                name="assessedNeed"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+              <div className="grid grid-cols-1 gap-6">
+                {[
+                  { label: "Wash hands & Hand Rub", name: "washHandsMaintenance" },
+                  { label: "Assessed need of central lines", name: "assessedNeed" },
+                  { label: "Sterile semipermeable dressing intact", name: "sterileDressing" },
+                  { label: "Each lumen flushed", name: "eachLumenFlushed" },
+                  { label: "No Signs of Erythema / Infection", name: "noErythema" },
+                ].map(field => (
+                  <Form.Item key={field.name} label={field.label} name={field.name} rules={[{ required: true }]}>
+                    <SelectionCard cols={2} options={yesNoOptions} />
+                  </Form.Item>
+                ))}
+              </div>
 
-              <Form.Item
-                label="Used sterile semipermeable dressing and is intact *"
-                name="sterileDressing"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
+              <div className="mt-8 mb-4">
+                <h4 className="text-md font-semibold text-gray-700 mb-4">Hub Care Bundle</h4>
+                <div className="grid grid-cols-1 gap-6">
+                  {[
+                    { label: "Wash hands & Hand Rub", name: "washHandsHubCare" },
+                    { label: "Wear sterile gloves", name: "wearSterileGloves" },
+                    { label: "Scrub access port for 15s & dry", name: "scrubPort" },
+                    { label: "Sterile field maintained", name: "sterileField" },
+                  ].map(field => (
+                    <Form.Item key={field.name} label={field.label} name={field.name} rules={[{ required: true }]}>
+                      <SelectionCard cols={2} options={yesNoOptions} />
+                    </Form.Item>
                   ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Each lumen flushed *"
-                name="eachLumenFlushed"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="No Signs of Erythema / Infection *"
-                name="noErythema"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <h3 className="text-lg font-medium mt-4">Hub Care Bundle</h3>
-
-              <Form.Item
-                label="Wash hands with soap and water f/b Hand Rub (As per policy) *"
-                name="washHandsHubCare"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Wear sterile gloves *"
-                name="wearSterileGloves"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Scrub access port for 15s & allow it to dry *"
-                name="scrubPort"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-
-              <Form.Item
-                label="Sterile field maintained *"
-                name="sterileField"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-            </div>
-          </div>
+                </div>
+              </div>
+            </Card>
           )}
 
           {/* Removal Bundle */}
           {selectedBundle === 'Removal Bundle' && (
-            <div className="bg-purple-100 p-4 rounded-md">
-              <h2 className="text-xl font-semibold mb-4">Removal Bundle</h2>
-            
-            <div className="space-y-4">
-              <Form.Item
-                label="Date of Removal *"
-                name="dateOfRemoval"
-                rules={[{ required: true, message: 'Please enter date of removal' }]}
-              >
-                <Input type="date" />
-              </Form.Item>
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Trash2 className="text-purple-600" size={20} />
+                  Removal Bundle
+                </h3>
+              </div>
 
-              <Form.Item
-                label="Reason for Removal *"
-                name="reasonForRemoval"
-                rules={[{ required: true, message: 'Please select reason for removal' }]}
-              >
-                <Radio.Group>
-                  {[
-                    'Insertion outside',
-                    'Suspected/Confirmed infection at central line insertion site',
-                    'Patient no longer needs central line',
-                    'Central line blocked/not working',
-                    'Reached maximum days'
-                  ].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Form.Item label="Date of Removal" name="dateOfRemoval" rules={[{ required: true }]}>
+                  <Input size="large" type="date" />
+                </Form.Item>
 
-              <Form.Item
-                label="Tip culture sent *"
-                name="tipCultureSent"
-                rules={[{ required: true, message: 'Please select an option' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  {['Yes', 'No'].map(option => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-            </div>
-          </div>
-          )}
+                <Form.Item label="Reason for Removal" name="reasonForRemoval" rules={[{ required: true }]}>
+                  <SelectionCard cols={1} options={removalReasons} />
+                </Form.Item>
 
-          {/* No Bundle Selected Message */}
-          {!selectedBundle && (
-            <div className="bg-gray-50 p-6 rounded-md text-center">
-              <p className="text-gray-600">Please select a bundle checklist above to view the form fields.</p>
-            </div>
+                <Form.Item label="Tip culture sent" name="tipCultureSent" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+              </div>
+            </Card>
           )}
 
           {/* Submit Section */}
-          <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between pt-6 border-t border-gray-200 pb-20">
             <div className="flex items-center space-x-2">
               {submitStatus === 'success' && (
                 <>
@@ -737,10 +378,13 @@ const CLABSIForm = () => {
             <Button
               type="primary"
               htmlType="submit"
+              size="large"
               loading={isSubmitting}
               disabled={isSubmitting || !selectedBundle}
+              icon={<Save size={18} />}
+              className="px-8 rounded-xl bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-200"
             >
-              <Save className="mr-2" /> Save Audit
+              Save Audit
             </Button>
           </div>
         </Form>

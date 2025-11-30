@@ -4,24 +4,29 @@ import {
   Save,
   CheckCircle,
   ArrowLeft,
+  LayoutDashboard,
+  Wind,
+  Activity,
+  Scan,
+  Trash2
 } from 'lucide-react';
-import { Form, Input, Select, Radio, Button, message, Spin } from 'antd';
+import { Form, Input, Select, Button, message, Spin, Card, Tag } from 'antd';
 import { useSupabaseAudits } from '../../hooks/useSupabaseAudits';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
 import { calculateNIVCompliance } from '../../utils/complianceCalculation';
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-
+import SelectionCard from '../common-components/SelectionCard';
+import {
+  respiratorySupportOptions,
+  nasalTraumaOptions,
+  cpapTypes,
+  nasalInterfaces,
+  hfncInterfaces,
+  yesNoOptions
+} from '../../constant/audit-options';
 
 const { Option } = Select;
-
-const respiratorySupportOptions = ['CPAP', 'NIPPV', 'HFNC'];
-const nasalTraumaOptions = [
-  'No trauma',
-  'Stage 1 - Non blanching erythema',
-  'Stage 2 - Superficial erosion',
-  'Stage 3 - Necrosis of skin',
-];
 
 const NIVForm = () => {
   const navigate = useNavigate();
@@ -40,6 +45,7 @@ const NIVForm = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -84,6 +90,7 @@ const NIVForm = () => {
         auditType: 'NIV',
         respiratorySupport: values.respiratorySupport,
         nivData: values,
+        auditImage: values.auditImage || null,
       };
       await createAudit(auditRecord);
       setShowSuccess(true);
@@ -98,328 +105,333 @@ const NIVForm = () => {
     }
   };
 
+  const onImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImagePreview(URL.createObjectURL(file));
+      form.setFieldsValue({ auditImage: file });
+    } else {
+      setImagePreview(null);
+      form.setFieldsValue({ auditImage: null });
+    }
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    form.setFieldsValue({ auditImage: null });
+  };
+
   if (showSuccess) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-900 mb-2">NIV Audit Submitted Successfully!</h2>
-          <p className="text-green-700">Your Non-Invasive Ventilation audit has been recorded. Redirecting to dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-lg w-full">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-green-900 mb-2">NIV Audit Submitted!</h2>
+          <p className="text-gray-500 mb-8">Your audit has been successfully recorded.</p>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2 overflow-hidden">
+            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+          </div>
+          <p className="text-xs text-gray-400">Redirecting to dashboard...</p>
         </div>
       </div>
     );
   }
 
-  const complianceDetails = calculateNIVCompliance(form.getFieldsValue());
-  const isLowCompliance = complianceDetails.score / 100 < 0.8;
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-600 to-purple-700">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate('/audit')}
-              className="text-purple-100 hover:text-white transition-colors"
-              type="button"
-              aria-label="Back to audits"
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-white">
-                Non-Invasive Ventilation (CPAP/NIV/HFNC) Audit
-              </h1>
-              <p className="text-purple-100 mt-1">2025 - Respiratory Support Compliance Assessment</p>
+    <div className="min-h-screen bg-gray-50/50 pb-12">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-[30px] z-10 shadow-sm">
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between h-fit">
+            <div className="flex items-center gap-4">
+              <Button
+                type="text"
+                shape="circle"
+                icon={<ArrowLeft size={20} />}
+                onClick={() => navigate('/audit')}
+                className="hover:bg-gray-100"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">NIV Audit</h1>
+                <p className="text-xs text-gray-500">Respiratory Support Compliance</p>
+              </div>
             </div>
+            <Tag color="purple" className="px-3 py-1 rounded-full">
+              {new Date().toLocaleDateString()}
+            </Tag>
           </div>
         </div>
+      </div>
 
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Form
           form={form}
           layout="vertical"
-          className="p-6 space-y-8"
+          className="space-y-8"
           onFinish={handleSubmit}
           initialValues={{
             respiratorySupport: '',
           }}
         >
-          {/* Basic Information */}
-          <div className="bg-gray-50 p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Form.Item
-              label="Patient Name *"
-              name="patientName"
-              rules={[{ required: true, message: 'Please enter patient name' }]}
-            >
-              <Input placeholder="Enter patient name" />
-            </Form.Item>
-            <Form.Item label="Bedside Staff Name" name="bedsideStaffName">
-              <Input placeholder="Enter bedside staff name" />
-            </Form.Item>
-            <Form.Item
-              label="NICU Area"
-              name="nicuArea"
-              rules={[{ required: true, message: 'Please select NICU Area' }]}
-            >
-              {loadingAreas ? (
-                <Spin />
-              ) : (
-                <Select 
-                  placeholder="Select NICU Area" 
-                  allowClear
-                  onChange={(value, option) => {
-                    const selectedArea = nicuAreas.find(area => area.name === value);
-                    if (selectedArea) {
-                      form.setFieldsValue({ nicuAreaId: selectedArea.id });
-                    }
-                  }}
-                >
-                  {nicuAreas.map((area) => (
-                    <Option key={area.id} value={area.name}>
-                      {area.name}
-                    </Option>
-                  ))}
-                </Select>
-              )}
-            </Form.Item>
-            <Form.Item
-              label="NICU Area Id"
-              name="nicuAreaId"
-              rules={[{ required: true, message: 'NICU Area ID is required' }]}
-              hidden
-            >
-              <Input disabled />
-            </Form.Item>
-          </div>
+          {/* Section 1: Context */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl overflow-hidden" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <LayoutDashboard className="text-purple-600" size={20} />
+                Audit Context
+              </h3>
+            </div>
 
-          {/* Common Questions / Respiratory Support */}
-          <Form.Item
-            label="Type of Respiratory Support *"
-            name="respiratorySupport"
-            rules={[{ required: true, message: 'Please select respiratory support type' }]}
-          >
-            <Select onChange={handleRespiratorySupportChange} placeholder="Select support type" allowClear>
-              {respiratorySupportOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          {/* Sections: Common, CPAP, NIPPV, HFNC */}
-          {/* Common Section */}
-          {expandedSections.common && (
-            <div className="bg-purple-50 rounded-lg p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-purple-900 mb-4">Common Questions</h3>
-              {[
-                { key: 'appropriateSize', label: 'Appropriate size prongs / mask used *' },
-                { key: 'skinBarrier', label: 'Skin barrier applied- hydrocolloid/silicon barrier (Tegaderm is an alternative) *' },
-                { key: 'gapNasalSeptum', label: '2 mm gap between nasal septum and the prong/ septum *' },
-                { key: 'skinBlanched', label: 'Skin on nasal septum blanched *' },
-                { key: 'prongsSecured', label: 'Prongs secured with a tape - to reduce moment *' },
-                { key: 'tractionInterface', label: 'Traction on the interface *' },
-                { key: 'circuitSecured', label: 'Circuit is supported and secured *' },
-                { key: 'gentleMassage', label: 'Gentle massage of nasal septum and bridge done in past 24 hours *' },
-                { key: 'humidification', label: 'Humidification is on *' },
-              ].map(({ key, label }) => (
-                <Form.Item
-                  key={key}
-                  name={key}
-                  label={label}
-                  rules={[{ required: true, message: 'This field is required' }]}
-                >
-                  <Radio.Group className="flex space-x-8">
-                    <Radio value="Yes">Yes</Radio>
-                    <Radio value="No">No</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Form.Item
-                label="Nasal septum trauma *"
-                name="nasalTrauma"
-                rules={[{ required: true, message: 'Please select nasal trauma assessment' }]}
+                label="NICU Area"
+                name="nicuArea"
+                rules={[{ required: true, message: 'Required' }]}
               >
-                <Radio.Group>
-                  {nasalTraumaOptions.map((option) => (
-                    <Radio key={option} value={option}>
-                      {option}
-                    </Radio>
-                  ))}
-                </Radio.Group>
+                {loadingAreas ? (
+                  <Spin />
+                ) : (
+                  <Select
+                    size="large"
+                    placeholder="Select Area"
+                    allowClear
+                    onChange={(value, option) => {
+                      const selectedArea = nicuAreas.find(area => area.name === value);
+                      if (selectedArea) {
+                        form.setFieldsValue({ nicuAreaId: selectedArea.id });
+                      }
+                    }}
+                  >
+                    {nicuAreas.map(area => (
+                      <Option key={area.id} value={area.name}>{area.name}</Option>
+                    ))}
+                  </Select>
+                )}
               </Form.Item>
-              
-              {/* Audit Image Upload */}
-              <Form.Item label="Audit Image" name="auditImage">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      form.setFieldsValue({ auditImage: file });
-                    }
-                  }}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
+              <Form.Item name="nicuAreaId" hidden><Input /></Form.Item>
+
+              <Form.Item label="Patient Name" name="patientName" rules={[{ required: true }]}>
+                <Input size="large" placeholder="Patient Name" />
+              </Form.Item>
+
+              <Form.Item label="Bedside Staff Name" name="bedsideStaffName">
+                <Input size="large" placeholder="Staff Name" />
               </Form.Item>
             </div>
+          </Card>
+
+          {/* Section 2: Respiratory Support */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Wind className="text-purple-600" size={20} />
+                Respiratory Support
+              </h3>
+            </div>
+            <Form.Item
+              name="respiratorySupport"
+              rules={[{ required: true, message: 'Please select support type' }]}
+            >
+              <SelectionCard
+                options={respiratorySupportOptions}
+                cols={3}
+                onChange={handleRespiratorySupportChange}
+              />
+            </Form.Item>
+          </Card>
+
+          {/* Common Section */}
+          {expandedSections.common && (
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Activity className="text-purple-600" size={20} />
+                  Common Assessment
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {[
+                  { key: 'appropriateSize', label: 'Appropriate size prongs / mask used' },
+                  { key: 'skinBarrier', label: 'Skin barrier applied (hydrocolloid/silicon/Tegaderm)' },
+                  { key: 'gapNasalSeptum', label: '2 mm gap between nasal septum and prong/septum' },
+                  { key: 'skinBlanched', label: 'Skin on nasal septum blanched' },
+                  { key: 'prongsSecured', label: 'Prongs secured with tape' },
+                  { key: 'tractionInterface', label: 'Traction on the interface' },
+                  { key: 'circuitSecured', label: 'Circuit is supported and secured' },
+                  { key: 'gentleMassage', label: 'Gentle massage of nasal septum done in past 24h' },
+                  { key: 'humidification', label: 'Humidification is on' },
+                ].map(({ key, label }) => (
+                  <Form.Item key={key} label={label} name={key} rules={[{ required: true }]}>
+                    <SelectionCard cols={2} options={yesNoOptions} />
+                  </Form.Item>
+                ))}
+
+                <Form.Item label="Nasal septum trauma" name="nasalTrauma" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={nasalTraumaOptions} />
+                </Form.Item>
+              </div>
+
+              <div className="mt-6">
+                <Form.Item label="Audit Image">
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {imagePreview ? (
+                      <div className="relative h-40 mx-auto rounded-lg overflow-hidden shadow-sm">
+                        <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeImage();
+                          }}
+                          className="absolute top-2 right-2 bg-white/90 text-red-500 p-1.5 rounded-full hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-4">
+                        <div className="bg-purple-50 p-3 rounded-full mb-3">
+                          <Scan className="text-purple-500" size={24} />
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">Click to upload</p>
+                        <p className="text-xs text-gray-500">SVG, PNG, JPG</p>
+                      </div>
+                    )}
+                  </div>
+                </Form.Item>
+              </div>
+            </Card>
           )}
 
           {/* CPAP Section */}
           {expandedSections.cpap && (
-            <div className="bg-purple-50 rounded-lg p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-purple-900 mb-4">CPAP</h3>
-              
-              {/* Description (optional) */}
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Wind className="text-purple-600" size={20} />
+                  CPAP Specifics
+                </h3>
+              </div>
+
               <Form.Item label="Description (optional)" name="cpapDescription">
-                <Input.TextArea rows={3} placeholder="Enter CPAP description..." />
+                <Input.TextArea rows={3} placeholder="Enter CPAP description..." className="rounded-xl" />
               </Form.Item>
-              
-              <Form.Item
-                label="Type of CPAP *"
-                name="typeOfCPAP"
-                rules={[{ required: true, message: 'Please select CPAP type' }]}
-              >
-                <Radio.Group>
-                  {['Bubble CPAP', 'Continuous CPAP (Ventilator)', 'Variable CPAP'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-              <Form.Item
-                label="Nasal Interface used *"
-                name="nasalInterfaceCPAP"
-                rules={[{ required: true, message: 'Please select nasal interface' }]}
-              >
-                <Radio.Group>
-                  {[
-                    'Nasal Mask',
-                    'Rams Cannula',
-                    'Short Binasal Prongs',
-                    'IFD',
-                    'Other…',
-                  ].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-              <Form.Item
-                label="Snugly fitting prongs, (If Rams cannula 80% of nares covered) (Checked with the camera focused and ascertained) *"
-                name="snugFitCPAP"
-                rules={[{ required: true, message: 'Please specify snug fit' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  <Radio value="Yes">Yes</Radio>
-                  <Radio value="No">No</Radio>
-                </Radio.Group>
-              </Form.Item>
-              <Form.Item label="Bubbling present (for bubble CPAP)" name="bubblingPresent">
-                <Radio.Group className="flex space-x-8">
-                  <Radio value="Yes">Yes</Radio>
-                  <Radio value="No">No</Radio>
-                </Radio.Group>
-              </Form.Item>
-            </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Form.Item label="Type of CPAP" name="typeOfCPAP" rules={[{ required: true }]}>
+                  <SelectionCard cols={1} options={cpapTypes} />
+                </Form.Item>
+
+                <Form.Item label="Nasal Interface used" name="nasalInterfaceCPAP" rules={[{ required: true }]}>
+                  <SelectionCard cols={1} options={nasalInterfaces} />
+                </Form.Item>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 mt-6">
+                <Form.Item
+                  label="Snugly fitting prongs (80% nares covered)"
+                  name="snugFitCPAP"
+                  rules={[{ required: true }]}
+                >
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+
+                <Form.Item label="Bubbling present (for bubble CPAP)" name="bubblingPresent">
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+              </div>
+            </Card>
           )}
 
           {/* NIPPV Section */}
           {expandedSections.nippv && (
-            <div className="bg-purple-50 rounded-lg p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-purple-900 mb-4">NIPPV</h3>
-              
-              {/* Description (optional) */}
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Wind className="text-purple-600" size={20} />
+                  NIPPV Specifics
+                </h3>
+              </div>
+
               <Form.Item label="Description (optional)" name="nippvDescription">
-                <Input.TextArea rows={3} placeholder="Enter NIPPV description..." />
+                <Input.TextArea rows={3} placeholder="Enter NIPPV description..." className="rounded-xl" />
               </Form.Item>
-              
-              <Form.Item
-                label="Nasal Interface used *"
-                name="nasalInterfaceNIPPV"
-                rules={[{ required: true, message: 'Please select nasal interface' }]}
-              >
-                <Radio.Group>
-                  {['Rams Cannula', 'Short Binasal Prongs', 'Nasal Mask', 'Other…'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-              <Form.Item
-                label="Snugly fitting prongs, (If Rams cannula 80% of nares covered) (Checked with the camera focused and ascertained) *"
-                name="snugFitNIPPV"
-                rules={[{ required: true, message: 'Please specify snug fit' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  <Radio value="Yes">Yes</Radio>
-                  <Radio value="No">No</Radio>
-                </Radio.Group>
-              </Form.Item>
-            </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <Form.Item label="Nasal Interface used" name="nasalInterfaceNIPPV" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={nasalInterfaces} />
+                </Form.Item>
+
+                <Form.Item
+                  label="Snugly fitting prongs (80% nares covered)"
+                  name="snugFitNIPPV"
+                  rules={[{ required: true }]}
+                >
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+              </div>
+            </Card>
           )}
 
           {/* HFNC Section */}
           {expandedSections.hfnc && (
-            <div className="bg-purple-50 rounded-lg p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-purple-900 mb-4">HFNC</h3>
-              
-              {/* Description (optional) */}
+            <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+              <div className="border-b border-gray-100 pb-4 mb-6">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <Wind className="text-purple-600" size={20} />
+                  HFNC Specifics
+                </h3>
+              </div>
+
               <Form.Item label="Description (optional)" name="hfncDescription">
-                <Input.TextArea rows={3} placeholder="Enter HFNC description..." />
+                <Input.TextArea rows={3} placeholder="Enter HFNC description..." className="rounded-xl" />
               </Form.Item>
-              
-              <Form.Item
-                label="Nasal Interface used *"
-                name="nasalInterfaceHFNC"
-                rules={[{ required: true, message: 'Please select nasal interface' }]}
-              >
-                <Radio.Group>
-                  {['HFNC Prongs', 'Other…'].map((opt) => (
-                    <Radio key={opt} value={opt}>
-                      {opt}
-                    </Radio>
-                  ))}
-                </Radio.Group>
-              </Form.Item>
-              <Form.Item
-                label="50% of Nares Covered by Nasal Prongs (Checked with the camera focused and ascertained) *"
-                name="naresCoveredHFNC"
-                rules={[{ required: true, message: 'Please indicate coverage' }]}
-              >
-                <Radio.Group className="flex space-x-8">
-                  <Radio value="Yes">Yes</Radio>
-                  <Radio value="No">No</Radio>
-                </Radio.Group>
-              </Form.Item>
-            </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <Form.Item label="Nasal Interface used" name="nasalInterfaceHFNC" rules={[{ required: true }]}>
+                  <SelectionCard cols={2} options={hfncInterfaces} />
+                </Form.Item>
+
+                <Form.Item
+                  label="50% of Nares Covered by Nasal Prongs"
+                  name="naresCoveredHFNC"
+                  rules={[{ required: true }]}
+                >
+                  <SelectionCard cols={2} options={yesNoOptions} />
+                </Form.Item>
+              </div>
+            </Card>
           )}
 
-
-
           {/* Submit Section */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-4 pt-4 pb-20">
             <Button
-              type="button"
+              size="large"
               onClick={() => navigate('/audit')}
-              className="px-6 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               disabled={isSubmitting}
+              className="px-8 rounded-xl"
             >
               Cancel
             </Button>
             <Button
               type="primary"
               htmlType="submit"
-              disabled={isSubmitting || !form.getFieldValue('respiratorySupport')}
+              size="large"
               loading={isSubmitting}
-              className="flex items-center space-x-2"
+              disabled={isSubmitting || !form.getFieldValue('respiratorySupport')}
+              icon={<Save size={18} />}
+              className="px-8 rounded-xl bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-200"
             >
-              <Save className="h-4 w-4" />
-              <span>{isSubmitting ? 'Submitting...' : 'Submit'}</span>
+              Submit Audit
             </Button>
           </div>
         </Form>

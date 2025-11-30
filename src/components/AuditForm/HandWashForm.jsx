@@ -6,22 +6,27 @@ import {
   Upload,
   X,
   ArrowLeft,
+  LayoutDashboard,
+  Droplets,
+  Scan,
+  Trash2
 } from "lucide-react";
 import {
   Form,
   Input,
   Select,
-  Radio,
-  Checkbox,
   Button,
   message,
   Spin,
+  Card,
+  Tag
 } from "antd";
 import { useSelector, useDispatch } from "react-redux";
 import { useSupabaseAudits } from "../../hooks/useSupabaseAudits";
 import { useAuth } from "../../hooks/useAuth";
 import { fetchNicuAreas } from '../../store/nicuAreaThunk';
-
+import SelectionCard from '../common-components/SelectionCard';
+import { handWashSteps, yesNoOptions } from '../../constant/audit-options';
 
 const { Option } = Select;
 
@@ -40,24 +45,7 @@ const HandWashForm = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [form] = Form.useForm();
-
-  // Options for selections
-  const hcpOptions = ["Doctor", "Nurse", "Housekeeping", "Radiology", "Others"];
-  const opportunityOptions = [
-    "Moment 1 - Before touching patients",
-    "Moment 2 - Before Clean Procedure",
-    "Moment 3 - After risk of body fluid exposure",
-    "Moment 4 - After touching the Patients",
-    "Moment 5 - After touching surroundings",
-  ];
-  const glovesForOptions = [
-    "Intubation",
-    "IV",
-    "Central line insertion",
-    "Central line maintenance",
-    "Drug administration",
-    "Other",
-  ];
+  const watchedNicuArea = Form.useWatch('nicuArea', form);
 
   // Fetch NICU Areas for current user's organization
   useEffect(() => {
@@ -82,6 +70,8 @@ const HandWashForm = () => {
         patientName: values.patientName,
         bedsideName: values.bedsideName,
         image: imageFile || null,
+        // Include step values
+        ...values
       };
       await createAudit(auditRecord);
       message.success("Audit successfully submitted!");
@@ -112,185 +102,202 @@ const HandWashForm = () => {
 
   if (submitSuccess) {
     return (
-      <div className="max-w-2xl mx-auto my-20">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <CheckCircle className="text-green-600 mx-auto mb-4" size={64} />
-          <h2 className="text-2xl font-bold text-green-900 mb-2">
-            Hand Wash Audit Submitted Successfully!
-          </h2>
-          <p className="text-green-700">Redirecting to dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-10 text-center max-w-lg w-full">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Audit Submitted!</h2>
+          <p className="text-gray-500 mb-8">Your hand wash audit has been successfully recorded.</p>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2 overflow-hidden">
+            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+          </div>
+          <p className="text-xs text-gray-400">Redirecting to dashboard...</p>
         </div>
       </div>
     );
   }
 
-  const currentValues = form.getFieldsValue();
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-md">
+    <div className="min-h-screen bg-gray-50/50 pb-12">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-[30px] z-10 shadow-sm">
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between h-fit">
+            <div className="flex items-center gap-4">
+              <Button
+                type="text"
+                shape="circle"
+                icon={<ArrowLeft size={20} />}
+                onClick={() => navigate('/audit')}
+                className="hover:bg-gray-100"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Hand Wash Checklist</h1>
+                <p className="text-xs text-gray-500">SUMANK Protocol Compliance</p>
+              </div>
+            </div>
+            <Tag color="cyan" className="px-3 py-1 rounded-full">
+              {new Date().toLocaleDateString()}
+            </Tag>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Form
           layout="vertical"
           form={form}
           onFinish={onFinish}
-          initialValues={{
-            hcp: [],
-            opportunityType: [],
-            adherence: [],
-            duration: [],
-            glovesFor: [],
-          }}
+          className="space-y-8"
         >
-          <div className="bg-cyan-600 text-white p-6 flex items-center space-x-4 rounded-t-lg">
-            <Button
-              type="text"
-              icon={<ArrowLeft />}
-              onClick={() => navigate("/audit")}
-              className="text-white"
-            />
-            <div>
-              <h1 className="text-2xl font-bold">Hand Wash Checklist</h1>
-              <p className="text-cyan-100 text-sm">
-                2025 - SUMANK Protocol Compliance Assessment
-              </p>
+          {/* Section 1: Context */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl overflow-hidden" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <LayoutDashboard className="text-cyan-600" size={20} />
+                Audit Context
+              </h3>
             </div>
-          </div>
 
-          <div className="p-6 space-y-8">
-            {/* Basic Section */}
-            <div className="bg-cyan-50 p-6 rounded-lg">
-              <h3 className="text-cyan-900 font-semibold mb-4">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Form.Item label="Patient Name" name="patientName">
-                  <Input placeholder="Enter patient name" />
-                </Form.Item>
-                <Form.Item label="Bedside Staff Name" name="bedsideName">
-                  <Input placeholder="Enter staff name" />
-                </Form.Item>
-                <Form.Item
-                  label="NICU Area *"
-                  name="nicuArea"
-                  rules={[{ required: true, message: "Please select a NICU area" }]}
-                >
-                  {loadingAreas ? (
-                    <Spin />
-                  ) : (
-                    <Select
-                      showSearch
-                      placeholder="Select NICU Area"
-                      filterOption={(input, option) =>
-                        option?.children.toLowerCase().includes(input.toLowerCase())
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Form.Item
+                label="NICU Area"
+                name="nicuArea"
+                rules={[{ required: true, message: "Required" }]}
+              >
+                {loadingAreas ? (
+                  <Spin />
+                ) : (
+                  <Select
+                    size="large"
+                    placeholder="Select Area"
+                    showSearch
+                    filterOption={(input, option) =>
+                      option?.children.toLowerCase().includes(input.toLowerCase())
+                    }
+                    onChange={(value, option) => {
+                      const selectedArea = nicuAreas.find(area => area.name === value);
+                      if (selectedArea) {
+                        form.setFieldsValue({ nicuAreaId: selectedArea.id });
                       }
-                      allowClear
-                      onChange={(value, option) => {
-                        const selectedArea = nicuAreas.find(area => area.name === value);
-                        if (selectedArea) {
-                          form.setFieldsValue({ nicuAreaId: selectedArea.id });
-                        }
-                      }}
-                    >
-                      {nicuAreas.map((n) => (
-                        <Option key={n.id} value={n.name}>
-                          {n.name}
-                        </Option>
-                      ))}
-                    </Select>
-                  )}
-                </Form.Item>
-                <Form.Item
-                  label="NICU Area Id"
-                  name="nicuAreaId"
-                  rules={[{ required: true, message: "NICU Area ID is required" }]}
-                  hidden
-                >
-                  <Input disabled />
-                </Form.Item>
-              </div>
+                    }}
+                  >
+                    {nicuAreas.map((n) => (
+                      <Option key={n.id} value={n.name}>{n.name}</Option>
+                    ))}
+                  </Select>
+                )}
+              </Form.Item>
+
+              <Form.Item name="nicuAreaId" hidden><Input /></Form.Item>
+
+              <Form.Item label="Patient Name" name="patientName">
+                <Input size="large" placeholder="Patient Identifier" />
+              </Form.Item>
+
+              <Form.Item label="Staff Name" name="bedsideName">
+                <Input size="large" placeholder="Staff Name" />
+              </Form.Item>
+            </div>
+          </Card>
+
+          {/* Section 2: Steps */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Droplets className="text-cyan-600" size={20} />
+                Hand Wash Steps
+              </h3>
             </div>
 
-
-
-            {/* Hand-Wash Steps */}
-            <div className="bg-cyan-50 p-6 rounded-lg">
-              <h3 className="text-cyan-900 font-semibold mb-4">Hand Wash Steps</h3>
-              {[
-                { label: "Wet hands with water *", key: "wetHands" },
-                { label: "Applied soap *", key: "appliedSoap" },
-                { label: "Rub palm to palm (S) *", key: "rubPalm" },
-                { label: "Right palm over left dorsum with interlaced fingers & vice versa (U) *", key: "rightOverLeft" },
-                { label: "Palm to palm with fingers interlaced *", key: "palmInterlaced" },
-                { label: "Back of fingers to opposing palms with fingers interlocked (M) *", key: "backFingers" },
-                { label: "Rotational rubbing of left thumb clasped in right and vice versa (A) *", key: "rotThumb" },
-                { label: "Rotational rubbing, backwards & forwards with clasped fingers of right hand in left palm and vice versa (N) *", key: "rotFingers" },
-                { label: "Wrist (K) *", key: "wrist" },
-                { label: "Rinse hands with water *", key: "rinseHands" },
-                { label: "Dry hands thoroughly with a single use towel *", key: "dryHands" },
-                { label: "Use an air dryer to thoroughly dry your hands *", key: "airDryer" },
-                { label: "Use towel or elbow to turn off faucet *", key: "turnOffFaucet" },
-              ].map(({ label, key }) => (
+            <div className="grid grid-cols-1 gap-6">
+              {handWashSteps.map(({ label, key, icon }) => (
                 <Form.Item
-                  label={label}
-                  name={key}
-                  rules={[{ required: true, message: "Please select Yes or No" }]}
                   key={key}
+                  label={
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500">{icon}</span>
+                      <span>{label}</span>
+                    </div>
+                  }
+                  name={key}
+                  rules={[{ required: true, message: "Required" }]}
                 >
-                  <Radio.Group className="flex space-x-8">
-                    <Radio value="Yes">Yes</Radio>
-                    <Radio value="No">No</Radio>
-                  </Radio.Group>
+                  <SelectionCard
+                    cols={2}
+                    options={yesNoOptions}
+                  />
                 </Form.Item>
               ))}
             </div>
+          </Card>
 
+          {/* Section 3: Evidence */}
+          <Card className="shadow-sm border-gray-100 rounded-2xl" bordered={false}>
+            <div className="border-b border-gray-100 pb-4 mb-6">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Save className="text-cyan-600" size={20} />
+                Evidence
+              </h3>
+            </div>
 
-
-
-
-
-
-            {/* Image Upload */}
-            <Form.Item label="Upload Image if any *">
-              <div className="flex items-center space-x-4">
+            <Form.Item label="Photo Evidence">
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors relative">
                 <input
                   type="file"
                   accept="image/*"
                   onChange={onImageChange}
-                  className="hidden"
-                  id="image-upload"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
-                <label
-                  htmlFor="image-upload"
-                  className="cursor-pointer rounded-md border border-dashed border-gray-300 px-4 py-2 text-gray-500 hover:bg-gray-100"
-                >
-                  <Upload />
-                  <span className="ml-2">Add Image</span>
-                </label>
-                {imagePreview && (
-                  <div className="relative rounded-md border border-gray-300 overflow-hidden w-24 h-24">
-                    <img src={imagePreview} alt="preview" className="object-cover w-full h-full" />
+                {imagePreview ? (
+                  <div className="relative h-40 mx-auto rounded-lg overflow-hidden shadow-sm">
+                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
                     <button
                       type="button"
-                      onClick={removeImage}
-                      className="absolute -top-1 -right-1 rounded-full bg-red-600 text-white p-1 hover:bg-red-700"
-                      aria-label="Remove image"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        removeImage();
+                      }}
+                      className="absolute top-2 right-2 bg-white/90 text-red-500 p-1.5 rounded-full hover:bg-red-50"
                     >
-                      <X size={16} />
+                      <Trash2 size={16} />
                     </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <div className="bg-cyan-50 p-3 rounded-full mb-3">
+                      <Scan className="text-cyan-500" size={24} />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">Click to upload</p>
+                    <p className="text-xs text-gray-500">SVG, PNG, JPG</p>
                   </div>
                 )}
               </div>
             </Form.Item>
+          </Card>
 
-            {/* Submit Buttons */}
-            <div className="flex justify-end space-x-4">
-              <Button onClick={() => navigate("/audit")} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button type="primary" htmlType="submit" loading={submitting}>
-                <Save className="mr-2" />
-                Submit
-              </Button>
-            </div>
+          {/* Footer Actions */}
+          <div className="flex items-center justify-end gap-4 pt-4 pb-20">
+            <Button
+              size="large"
+              onClick={() => navigate('/audit')}
+              disabled={submitting}
+              className="px-8 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              size="large"
+              loading={submitting}
+              icon={<Save size={18} />}
+              disabled={submitting || !watchedNicuArea}
+              className="px-8 rounded-xl bg-cyan-600 hover:bg-cyan-700 shadow-lg shadow-cyan-200"
+            >
+              Submit Audit
+            </Button>
           </div>
         </Form>
       </div>
